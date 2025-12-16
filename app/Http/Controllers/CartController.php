@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateCartItemRequest;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -30,6 +31,11 @@ class CartController extends Controller
     {
         $request->validate([
             'quantity' => ['required', 'integer', 'min:1', 'max:100'],
+        ], [
+            'quantity.required' => 'Укажите количество',
+            'quantity.integer' => 'Количество должно быть целым числом',
+            'quantity.min' => 'Минимальное количество - 1',
+            'quantity.max' => 'Максимальное количество - 100',
         ]);
 
         try {
@@ -87,12 +93,8 @@ class CartController extends Controller
     /**
      * Обновить количество товара
      */
-    public function update(Request $request, $itemId)
+    public function update(UpdateCartItemRequest $request, $itemId)
     {
-        $request->validate([
-            'quantity' => ['required', 'integer', 'min:1', 'max:100'],
-        ]);
-
         try {
             $cart = auth()->user()->cart;
             $cartItem = $cart->items()->findOrFail($itemId);
@@ -118,7 +120,7 @@ class CartController extends Controller
     /**
      * Удалить товар из корзины
      */
-    public function remove($itemId)
+    public function destroy($itemId)
     {
         try {
             $cart = auth()->user()->cart;
