@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreReviewRequest;
 use App\Models\Product;
 use App\Models\Review;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class ReviewController extends Controller
@@ -26,13 +26,8 @@ class ReviewController extends Controller
     }
 
     // Добавить отзыв
-    public function store(Request $request, Product $product)
+    public function store(StoreReviewRequest $request, Product $product)
     {
-        $request->validate([
-            'rating' => ['required', 'integer', 'min:1', 'max:5'],
-            'comment' => ['nullable', 'string', 'max:1000'],
-        ]);
-
         try {
             Review::query()->updateOrCreate(
                 [
