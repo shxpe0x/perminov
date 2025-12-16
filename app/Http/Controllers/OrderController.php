@@ -2,10 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreOrderRequest;
 use App\Models\Order;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -17,12 +15,32 @@ class OrderController extends Controller
     }
 
     /**
-     * История заказов пользователя
+     * Список заказов пользователя
      */
     public function index()
     {
-        $orders = Auth::user()->orders()->orderByDesc('created_at')->paginate(10);
+        $orders = auth()->user()
+            ->orders()
+            ->with('items.product')
+            ->orderByDesc('created_at')
+            ->paginate(10);
+
         return view('orders.index', compact('orders'));
+    }
+
+    /**
+     * Показать заказ
+     */
+    public function show(Order $order)
+    {
+        // Проверяем, что заказ принадлежит текущему пользователю
+        if ($order->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $order->load('items.product');
+
+        return view('orders.show', compact('order'));
     }
 
     /**
@@ -30,31 +48,38 @@ class OrderController extends Controller
      */
     public function create()
     {
-        $cart = Auth::user()->cart;
+        $cart = auth()->user()->cart()->with('items.product')->first();
 
         if (!$cart || $cart->items->isEmpty()) {
-            return redirect()->route('cart.index')->with('error', 'Корзина пуста.');
+            return redirect()->route('cart.index')
+                ->with('error', 'Корзина пуста.');
         }
 
         return view('orders.create', compact('cart'));
     }
 
     /**
-     * Создание заказа
+     * Создать заказ
      */
-    public function store(StoreOrderRequest $request)
+    public function store(Request $request)
     {
+        $request->validate([
+            'delivery_address' => ['required', 'string', 'max:500'],
+            'phone' => ['required', 'string', 'max:20'],
+            'comment' => ['nullable', 'string', 'max:1000'],
+        ]);
+
         try {
-            $cart = Auth::user()->cart;
+            $cart = auth()->user()->cart()->with('items.product')->first();
 
             if (!$cart || $cart->items->isEmpty()) {
-                return redirect()->route('cart.index')->with('error', 'Корзина пуста.');
+                return back()->with('error', 'Корзина пуста.');
             }
 
-            // Проверка наличия
+            // Проверяем наличие товаров
             foreach ($cart->items as $item) {
-                if ($item->product->stock < $item->quantity) {
-                    return back()->withInput()->with('error', "Товар {$item->product->brand} {$item->product->model} закончился на складе.");
+                if ($item->quantity > $item->product->stock) {
+                    return back()->with('error', "Товар {$item->product->brand} {$item->product->model} закончился на складе.");
                 }
             }
 
@@ -62,29 +87,23 @@ class OrderController extends Controller
 
             // Создаём заказ
             $order = Order::create([
-                'user_id' => Auth::id(),
-                'order_number' => Order::generateOrderNumber(),
+                'user_id' => auth()->id(),
                 'status' => Order::STATUS_NEW,
-                'total_amount' => $cart->total,
-                'customer_name' => $request->input('customer_name'),
-                'customer_phone' => $request->input('customer_phone'),
-                'customer_email' => $request->input('customer_email'),
-                'delivery_address' => $request->input('delivery_address'),
-                'notes' => $request->input('notes'),
+                'total_price' => $cart->total,
+                'delivery_address' => $request->delivery_address,
+                'phone' => $request->phone,
+                'comment' => $request->comment,
             ]);
 
-            // Копируем товары из корзины в заказ
+            // Копируем элементы из корзины
             foreach ($cart->items as $item) {
                 $order->items()->create([
                     'product_id' => $item->product_id,
                     'quantity' => $item->quantity,
-                    'price' => $item->product->price,
-                    'product_name' => $item->product->model,
-                    'product_brand' => $item->product->brand,
-                    'product_model' => $item->product->model,
+                    'price' => $item->price,
                 ]);
 
-                // Уменьшаем остатки
+                // Уменьшаем остаток на складе
                 $item->product->decrement('stock', $item->quantity);
             }
 
@@ -94,34 +113,24 @@ class OrderController extends Controller
             DB::commit();
 
             Log::info('Заказ создан', [
-                'user_id' => Auth::id(),
+                'user_id' => auth()->id(),
                 'order_id' => $order->id,
-                'order_number' => $order->order_number,
+                'total' => $order->total_price,
             ]);
 
             return redirect()->route('orders.show', $order)
-                ->with('success', 'Заказ успешно оформлен!');
+                ->with('success', 'Заказ №' . $order->id . ' успешно оформлен!');
         } catch (\Exception $e) {
             DB::rollBack();
+
             Log::error('Ошибка создания заказа', [
-                'user_id' => Auth::id(),
+                'user_id' => auth()->id(),
                 'error' => $e->getMessage(),
             ]);
 
-            return back()->withInput()->with('error', 'Ошибка при оформлении заказа.');
+            return back()
+                ->withInput()
+                ->with('error', 'Ошибка при оформлении заказа. Попробуйте снова.');
         }
-    }
-
-    /**
-     * Просмотр заказа
-     */
-    public function show(Order $order)
-    {
-        // Проверяем, что заказ принадлежит текущему пользователю
-        if ($order->user_id !== Auth::id()) {
-            abort(403);
-        }
-
-        return view('orders.show', compact('order'));
     }
 }

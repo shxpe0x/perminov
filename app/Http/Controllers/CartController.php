@@ -2,20 +2,24 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cart;
 use App\Models\Product;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class CartController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth');
+    }
+
     /**
-     * Просмотр корзины
+     * Показать корзину
      */
     public function index()
     {
-        $cart = $this->getCart();
+        $cart = auth()->user()->cart()->with('items.product')->first();
+
         return view('cart.index', compact('cart'));
     }
 
@@ -25,37 +29,57 @@ class CartController extends Controller
     public function add(Request $request, Product $product)
     {
         $request->validate([
-            'quantity' => ['required', 'integer', 'min:1', 'max:999'],
+            'quantity' => ['required', 'integer', 'min:1', 'max:100'],
         ]);
 
         try {
-            $cart = $this->getOrCreateCart();
-            $quantity = (int) $request->input('quantity', 1);
-
-            // Проверяем наличие
-            if ($product->stock < $quantity) {
-                return back()->with('error', 'Недостаточно товара на складе.');
+            if (!$product->isInStock()) {
+                return back()->with('error', 'Товара нет в наличии.');
             }
 
-            // Если товар уже есть в корзине - увеличиваем количество
+            $quantity = (int) $request->input('quantity', 1);
+
+            if ($quantity > $product->stock) {
+                return back()->with('error', "Недостаточно товара на складе. Доступно: {$product->stock}");
+            }
+
+            $cart = auth()->user()->getOrCreateCart();
+
+            // Проверяем, есть ли уже такой товар в корзине
             $cartItem = $cart->items()->where('product_id', $product->id)->first();
 
             if ($cartItem) {
+                // Увеличиваем количество
                 $newQuantity = $cartItem->quantity + $quantity;
-                if ($product->stock < $newQuantity) {
-                    return back()->with('error', 'Недостаточно товара на складе.');
+
+                if ($newQuantity > $product->stock) {
+                    return back()->with('error', "Невозможно добавить. Доступно: {$product->stock}");
                 }
+
                 $cartItem->update(['quantity' => $newQuantity]);
             } else {
+                // Добавляем новый элемент
                 $cart->items()->create([
                     'product_id' => $product->id,
                     'quantity' => $quantity,
+                    'price' => $product->price,
                 ]);
             }
 
-            return back()->with('success', 'Товар добавлен в корзину.');
+            Log::info('Товар добавлен в корзину', [
+                'user_id' => auth()->id(),
+                'product_id' => $product->id,
+                'quantity' => $quantity,
+            ]);
+
+            return back()->with('success', 'Товар добавлен в корзину!');
         } catch (\Exception $e) {
-            Log::error('Ошибка добавления в корзину', ['error' => $e->getMessage()]);
+            Log::error('Ошибка добавления в корзину', [
+                'user_id' => auth()->id(),
+                'product_id' => $product->id,
+                'error' => $e->getMessage(),
+            ]);
+
             return back()->with('error', 'Ошибка при добавлении товара.');
         }
     }
@@ -66,27 +90,27 @@ class CartController extends Controller
     public function update(Request $request, $itemId)
     {
         $request->validate([
-            'quantity' => ['required', 'integer', 'min:1', 'max:999'],
+            'quantity' => ['required', 'integer', 'min:1', 'max:100'],
         ]);
 
         try {
-            $cart = $this->getCart();
-            if (!$cart) {
-                return back()->with('error', 'Корзина пуста.');
-            }
-
+            $cart = auth()->user()->cart;
             $cartItem = $cart->items()->findOrFail($itemId);
             $quantity = (int) $request->input('quantity');
 
-            if ($cartItem->product->stock < $quantity) {
-                return back()->with('error', 'Недостаточно товара на складе.');
+            if ($quantity > $cartItem->product->stock) {
+                return back()->with('error', "Недостаточно товара. Доступно: {$cartItem->product->stock}");
             }
 
             $cartItem->update(['quantity' => $quantity]);
 
             return back()->with('success', 'Количество обновлено.');
         } catch (\Exception $e) {
-            Log::error('Ошибка обновления корзины', ['error' => $e->getMessage()]);
+            Log::error('Ошибка обновления корзины', [
+                'user_id' => auth()->id(),
+                'error' => $e->getMessage(),
+            ]);
+
             return back()->with('error', 'Ошибка при обновлении.');
         }
     }
@@ -97,16 +121,17 @@ class CartController extends Controller
     public function remove($itemId)
     {
         try {
-            $cart = $this->getCart();
-            if (!$cart) {
-                return back()->with('error', 'Корзина пуста.');
-            }
-
-            $cart->items()->findOrFail($itemId)->delete();
+            $cart = auth()->user()->cart;
+            $cartItem = $cart->items()->findOrFail($itemId);
+            $cartItem->delete();
 
             return back()->with('success', 'Товар удалён из корзины.');
         } catch (\Exception $e) {
-            Log::error('Ошибка удаления из корзины', ['error' => $e->getMessage()]);
+            Log::error('Ошибка удаления из корзины', [
+                'user_id' => auth()->id(),
+                'error' => $e->getMessage(),
+            ]);
+
             return back()->with('error', 'Ошибка при удалении.');
         }
     }
@@ -117,42 +142,17 @@ class CartController extends Controller
     public function clear()
     {
         try {
-            $cart = $this->getCart();
-            if ($cart) {
-                $cart->items()->delete();
-            }
+            $cart = auth()->user()->cart;
+            $cart->items()->delete();
 
             return back()->with('success', 'Корзина очищена.');
         } catch (\Exception $e) {
-            Log::error('Ошибка очистки корзины', ['error' => $e->getMessage()]);
-            return back()->with('error', 'Ошибка при очистке.');
+            Log::error('Ошибка очистки корзины', [
+                'user_id' => auth()->id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', 'Ошибка при очистке корзины.');
         }
-    }
-
-    /**
-     * Получить текущую корзину
-     */
-    private function getCart(): ?Cart
-    {
-        if (Auth::check()) {
-            return Auth::user()->cart;
-        }
-
-        return Cart::where('session_id', session()->getId())->first();
-    }
-
-    /**
-     * Получить или создать корзину
-     */
-    private function getOrCreateCart(): Cart
-    {
-        if (Auth::check()) {
-            return Auth::user()->getOrCreateCart();
-        }
-
-        return Cart::firstOrCreate(
-            ['session_id' => session()->getId()],
-            ['session_id' => session()->getId()]
-        );
     }
 }

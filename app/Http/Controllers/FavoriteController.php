@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Favorite;
 use App\Models\Product;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class FavoriteController extends Controller
 {
@@ -13,38 +12,51 @@ class FavoriteController extends Controller
         $this->middleware('auth');
     }
 
-    // Список избранного
+    /**
+     * Список избранных товаров
+     */
     public function index()
     {
         $favorites = auth()->user()
             ->favorites()
-            ->with('product')
-            ->latest()
+            ->with('category')
             ->paginate(12);
 
         return view('favorites.index', compact('favorites'));
     }
 
-    // Добавить в избранное
+    /**
+     * Добавить в избранное
+     */
     public function toggle(Product $product)
     {
-        $userId = auth()->id();
+        try {
+            $user = auth()->user();
 
-        $favorite = Favorite::query()
-            ->where('user_id', $userId)
-            ->where('product_id', $product->id)
-            ->first();
+            if ($user->hasFavorite($product->id)) {
+                // Удаляем из избранного
+                $user->favorites()->detach($product->id);
+                $message = 'Товар удалён из избранного.';
+            } else {
+                // Добавляем в избранное
+                $user->favorites()->attach($product->id);
+                $message = 'Товар добавлен в избранное!';
+            }
 
-        if ($favorite) {
-            $favorite->delete();
-            return back()->with('success', 'Удалено из избранного');
+            Log::info('Изменение избранного', [
+                'user_id' => auth()->id(),
+                'product_id' => $product->id,
+            ]);
+
+            return back()->with('success', $message);
+        } catch (\Exception $e) {
+            Log::error('Ошибка изменения избранного', [
+                'user_id' => auth()->id(),
+                'product_id' => $product->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', 'Ошибка при изменении избранного.');
         }
-
-        Favorite::query()->create([
-            'user_id' => $userId,
-            'product_id' => $product->id,
-        ]);
-
-        return back()->with('success', 'Добавлено в избранное');
     }
 }
