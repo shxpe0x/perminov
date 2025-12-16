@@ -19,7 +19,7 @@ class DatabaseSeeder extends Seeder
         // Создаём админа
         User::create([
             'name' => 'Admin',
-            'phone' => '+79999999999',
+            'phone' => '79999999999', // БЕЗ +
             'password' => Hash::make('password'),
             'is_admin' => true,
         ]);
@@ -27,7 +27,7 @@ class DatabaseSeeder extends Seeder
         // Создаём обычного юзера
         User::create([
             'name' => 'Test User',
-            'phone' => '+79876543210',
+            'phone' => '79876543210', // БЕЗ +
             'password' => Hash::make('password'),
             'is_admin' => false,
         ]);
