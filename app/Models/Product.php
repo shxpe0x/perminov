@@ -3,31 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
     use SoftDeletes;
 
-    protected $fillable = [
-        'category_id',
-        'type',
-        'brand',
-        'model',
-        'price',
-        'description',
-        'image',
-        'stock',
-    ];
+    protected $fillable = ['category_id', 'type', 'brand', 'model', 'price', 'stock', 'description', 'image'];
 
     protected $casts = [
         'price' => 'integer',
-        'type' => 'string',
-        'category_id' => 'integer',
         'stock' => 'integer',
+        'type' => 'string',
     ];
 
     /**
@@ -47,19 +37,19 @@ class Product extends Model
     }
 
     /**
-     * Одобренные отзывы
+     * Элементы корзины с этим товаром
      */
-    public function approvedReviews(): HasMany
+    public function cartItems(): HasMany
     {
-        return $this->reviews()->approved();
+        return $this->hasMany(CartItem::class);
     }
 
     /**
-     * Избранное пользователей
+     * Элементы заказов с этим товаром
      */
-    public function favorites(): HasMany
+    public function orderItems(): HasMany
     {
-        return $this->hasMany(Favorite::class);
+        return $this->hasMany(OrderItem::class);
     }
 
     // Scopes
@@ -94,9 +84,16 @@ class Product extends Model
 
         return $query->where(function ($q) use ($search) {
             $q->where('brand', 'like', "%{$search}%")
-              ->orWhere('model', 'like', "%{$search}%")
-              ->orWhere('description', 'like', "%{$search}%");
+              ->orWhere('model', 'like', "%{$search}%");
         });
+    }
+
+    /**
+     * Scope для фильтрации по категории
+     */
+    public function scopeByCategory($query, $categoryId)
+    {
+        return $query->where('category_id', $categoryId);
     }
 
     /**
@@ -118,39 +115,20 @@ class Product extends Model
     }
 
     /**
-     * Средний рейтинг товара
-     */
-    public function getAverageRatingAttribute(): float
-    {
-        return Cache::remember("product_{$this->id}_rating", 3600, function () {
-            return $this->approvedReviews()->avg('rating') ?? 0;
-        });
-    }
-
-    /**
-     * Количество отзывов
-     */
-    public function getReviewsCountAttribute(): int
-    {
-        return Cache::remember("product_{$this->id}_reviews_count", 3600, function () {
-            return $this->approvedReviews()->count();
-        });
-    }
-
-    /**
-     * URL изображения или заглушка
+     * Получить URL изображения
      */
     public function getImageUrlAttribute(): string
     {
-        if ($this->image && file_exists(public_path('storage/' . $this->image))) {
-            return asset('storage/' . $this->image);
+        if ($this->image && Storage::disk('public')->exists($this->image)) {
+            return Storage::disk('public')->url($this->image);
         }
 
+        // Placeholder если нет изображения
         return asset('images/no-image.png');
     }
 
     /**
-     * Проверка наличия товара
+     * Есть ли товар в наличии
      */
     public function isInStock(): bool
     {
@@ -158,10 +136,18 @@ class Product extends Model
     }
 
     /**
-     * Проверка, добавлен ли товар в избранное пользователем
+     * Получить средний рейтинг
      */
-    public function isFavoritedBy($userId): bool
+    public function getAverageRatingAttribute(): float
     {
-        return $this->favorites()->where('user_id', $userId)->exists();
+        return $this->reviews()->avg('rating') ?? 0;
+    }
+
+    /**
+     * Получить количество отзывов
+     */
+    public function getReviewsCountAttribute(): int
+    {
+        return $this->reviews()->count();
     }
 }

@@ -3,37 +3,47 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
+    /**
+     * The attributes that are mass assignable.
+     */
     protected $fillable = [
         'name',
         'phone',
         'email',
         'password',
-        'is_blocked',
     ];
 
+    /**
+     * The attributes that should be hidden for serialization.
+     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
+    /**
+     * The attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
-            'is_blocked' => 'boolean',
         ];
     }
+
+    // Отношения
 
     /**
      * Корзина пользователя
@@ -52,20 +62,23 @@ class User extends Authenticatable
     }
 
     /**
-     * Избранные товары
-     */
-    public function favorites(): HasMany
-    {
-        return $this->hasMany(Favorite::class);
-    }
-
-    /**
      * Отзывы пользователя
      */
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
     }
+
+    /**
+     * Избранные товары
+     */
+    public function favorites(): BelongsToMany
+    {
+        return $this->belongsToMany(Product::class, 'favorites')
+                    ->withTimestamps();
+    }
+
+    // Методы
 
     /**
      * Проверка, является ли пользователь администратором
@@ -76,12 +89,26 @@ class User extends Authenticatable
     }
 
     /**
-     * Проверка, заблокирован ли пользователь
+     * Получить или создать корзину
      */
-    public function isBlocked(): bool
+    public function getOrCreateCart(): Cart
     {
-        return (bool) $this->is_blocked;
+        if (!$this->cart) {
+            return $this->cart()->create();
+        }
+
+        return $this->cart;
     }
+
+    /**
+     * Проверить, есть ли товар в избранном
+     */
+    public function hasFavorite(int $productId): bool
+    {
+        return $this->favorites()->where('product_id', $productId)->exists();
+    }
+
+    // Аксессоры
 
     /**
      * Форматированный номер телефона
@@ -98,13 +125,5 @@ class User extends Authenticatable
         }
 
         return $this->phone;
-    }
-
-    /**
-     * Получить или создать корзину
-     */
-    public function getOrCreateCart(): Cart
-    {
-        return $this->cart ?? $this->cart()->create();
     }
 }
