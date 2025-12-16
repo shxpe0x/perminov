@@ -26,18 +26,19 @@ class CatalogController extends Controller
 
         $query = Product::query();
 
-        if ($type) {
-            $query->where('type', $type);
+        // Используем scope для фильтрации по типу
+        if ($type === 'computer') {
+            $query->computers();
+        } elseif ($type === 'peripheral') {
+            $query->peripherals();
         }
 
+        // Используем scope для поиска (с экранированием внутри)
         if ($q !== '') {
-            $query->where(function ($sub) use ($q) {
-                $sub->where('brand', 'like', "%{$q}%")
-                    ->orWhere('model', 'like', "%{$q}%");
-            });
+            $query->search($q);
         }
 
-        // Важно: сортировку берем только из whitelist (sort/dir мы уже провалидировали).
+        // Сортировка из whitelist
         $query->orderBy($sort, $dir);
 
         $products = $query->paginate($perPage)->withQueryString();

@@ -10,13 +10,9 @@ class AdminMiddleware
 {
     public function handle(Request $request, Closure $next): Response
     {
-        // auth middleware должен стоять раньше, но на всякий:
-        if (! $request->user()) {
-            abort(403);
-        }
-
-        if (! (bool) $request->user()->is_admin) {
-            abort(403);
+        // Проверяем авторизацию и права админа в одной строке
+        if (! $request->user()?->is_admin) {
+            abort(403, 'Доступ запрещён. Требуются права администратора.');
         }
 
         return $next($request);

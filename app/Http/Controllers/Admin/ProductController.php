@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Models\Product;
+use Illuminate\Support\Facades\Log;
 
 class ProductController extends Controller
 {
@@ -23,11 +24,27 @@ class ProductController extends Controller
 
     public function store(StoreProductRequest $request)
     {
-        Product::query()->create($request->validated());
+        try {
+            $product = Product::query()->create($request->validated());
 
-        return redirect()
-            ->route('products.index')
-            ->with('success', 'Товар добавлен.');
+            Log::info('Товар создан', [
+                'admin_id' => auth()->id(),
+                'product_id' => $product->id,
+            ]);
+
+            return redirect()
+                ->route('products.index')
+                ->with('success', 'Товар добавлен.');
+        } catch (\Exception $e) {
+            Log::error('Ошибка создания товара', [
+                'admin_id' => auth()->id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()
+                ->withInput()
+                ->with('error', 'Ошибка при создании товара. Попробуйте снова.');
+        }
     }
 
     public function show(Product $product)
@@ -43,19 +60,53 @@ class ProductController extends Controller
 
     public function update(UpdateProductRequest $request, Product $product)
     {
-        $product->update($request->validated());
+        try {
+            $product->update($request->validated());
 
-        return redirect()
-            ->route('products.index')
-            ->with('success', 'Товар обновлён.');
+            Log::info('Товар обновлён', [
+                'admin_id' => auth()->id(),
+                'product_id' => $product->id,
+            ]);
+
+            return redirect()
+                ->route('products.index')
+                ->with('success', 'Товар обновлён.');
+        } catch (\Exception $e) {
+            Log::error('Ошибка обновления товара', [
+                'admin_id' => auth()->id(),
+                'product_id' => $product->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()
+                ->withInput()
+                ->with('error', 'Ошибка при обновлении товара. Попробуйте снова.');
+        }
     }
 
     public function destroy(Product $product)
     {
-        $product->delete();
+        try {
+            $productId = $product->id;
+            $product->delete();
 
-        return redirect()
-            ->route('products.index')
-            ->with('success', 'Товар удалён.');
+            Log::info('Товар удалён', [
+                'admin_id' => auth()->id(),
+                'product_id' => $productId,
+            ]);
+
+            return redirect()
+                ->route('products.index')
+                ->with('success', 'Товар удалён.');
+        } catch (\Exception $e) {
+            Log::error('Ошибка удаления товара', [
+                'admin_id' => auth()->id(),
+                'product_id' => $product->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()
+                ->with('error', 'Ошибка при удалении товара. Попробуйте снова.');
+        }
     }
 }
