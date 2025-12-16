@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreOrderRequest;
 use App\Models\Order;
-use App\Models\OrderItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -15,132 +16,112 @@ class OrderController extends Controller
         $this->middleware('auth');
     }
 
-    // Список заказов пользователя
+    /**
+     * История заказов пользователя
+     */
     public function index()
     {
-        $orders = auth()->user()
-            ->orders()
-            ->with('items.product')
-            ->orderByDesc('created_at')
-            ->paginate(10);
-
+        $orders = Auth::user()->orders()->orderByDesc('created_at')->paginate(10);
         return view('orders.index', compact('orders'));
     }
 
-    // Просмотр заказа
-    public function show(Order $order)
-    {
-        $this->authorize('view', $order);
-
-        $order->load('items.product');
-
-        return view('orders.show', compact('order'));
-    }
-
-    // Форма оформления заказа
+    /**
+     * Форма оформления заказа
+     */
     public function create()
     {
-        $cartItems = auth()->user()
-            ->cartItems()
-            ->with('product')
-            ->get();
+        $cart = Auth::user()->cart;
 
-        if ($cartItems->isEmpty()) {
-            return redirect()
-                ->route('cart.index')
-                ->with('error', 'Корзина пуста');
+        if (!$cart || $cart->items->isEmpty()) {
+            return redirect()->route('cart.index')->with('error', 'Корзина пуста.');
         }
 
-        $total = $cartItems->sum(fn($item) => $item->subtotal);
-
-        return view('orders.create', compact('cartItems', 'total'));
+        return view('orders.create', compact('cart'));
     }
 
-    // Создание заказа
-    public function store(Request $request)
+    /**
+     * Создание заказа
+     */
+    public function store(StoreOrderRequest $request)
     {
-        $request->validate([
-            'delivery_address' => ['required', 'string', 'max:500'],
-            'comment' => ['nullable', 'string', 'max:1000'],
-        ]);
-
-        $user = auth()->user();
-        $cartItems = $user->cartItems()->with('product')->get();
-
-        if ($cartItems->isEmpty()) {
-            return redirect()
-                ->route('cart.index')
-                ->with('error', 'Корзина пуста');
-        }
-
         try {
+            $cart = Auth::user()->cart;
+
+            if (!$cart || $cart->items->isEmpty()) {
+                return redirect()->route('cart.index')->with('error', 'Корзина пуста.');
+            }
+
+            // Проверка наличия
+            foreach ($cart->items as $item) {
+                if ($item->product->stock < $item->quantity) {
+                    return back()->withInput()->with('error', "Товар {$item->product->brand} {$item->product->model} закончился на складе.");
+                }
+            }
+
             DB::beginTransaction();
 
             // Создаём заказ
-            $total = $cartItems->sum(fn($item) => $item->subtotal);
-
-            $order = Order::query()->create([
-                'user_id' => $user->id,
+            $order = Order::create([
+                'user_id' => Auth::id(),
+                'order_number' => Order::generateOrderNumber(),
                 'status' => Order::STATUS_NEW,
-                'total_price' => $total,
+                'total_amount' => $cart->total,
+                'customer_name' => $request->input('customer_name'),
+                'customer_phone' => $request->input('customer_phone'),
+                'customer_email' => $request->input('customer_email'),
                 'delivery_address' => $request->input('delivery_address'),
-                'comment' => $request->input('comment'),
+                'notes' => $request->input('notes'),
             ]);
 
-            // Добавляем товары в заказ
-            foreach ($cartItems as $cartItem) {
-                OrderItem::query()->create([
-                    'order_id' => $order->id,
-                    'product_id' => $cartItem->product_id,
-                    'quantity' => $cartItem->quantity,
-                    'price' => $cartItem->product->price,
+            // Копируем товары из корзины в заказ
+            foreach ($cart->items as $item) {
+                $order->items()->create([
+                    'product_id' => $item->product_id,
+                    'quantity' => $item->quantity,
+                    'price' => $item->product->price,
+                    'product_name' => $item->product->model,
+                    'product_brand' => $item->product->brand,
+                    'product_model' => $item->product->model,
                 ]);
+
+                // Уменьшаем остатки
+                $item->product->decrement('stock', $item->quantity);
             }
 
             // Очищаем корзину
-            $user->cartItems()->delete();
+            $cart->items()->delete();
 
             DB::commit();
 
             Log::info('Заказ создан', [
-                'user_id' => $user->id,
+                'user_id' => Auth::id(),
                 'order_id' => $order->id,
-                'total' => $total,
+                'order_number' => $order->order_number,
             ]);
 
-            return redirect()
-                ->route('orders.show', $order)
-                ->with('success', 'Заказ №' . $order->id . ' успешно оформлен!');
-
+            return redirect()->route('orders.show', $order)
+                ->with('success', 'Заказ успешно оформлен!');
         } catch (\Exception $e) {
             DB::rollBack();
-
             Log::error('Ошибка создания заказа', [
-                'user_id' => $user->id,
+                'user_id' => Auth::id(),
                 'error' => $e->getMessage(),
             ]);
 
-            return back()
-                ->withInput()
-                ->with('error', 'Ошибка при создании заказа. Попробуйте снова.');
+            return back()->withInput()->with('error', 'Ошибка при оформлении заказа.');
         }
     }
 
-    // Отмена заказа
-    public function cancel(Order $order)
+    /**
+     * Просмотр заказа
+     */
+    public function show(Order $order)
     {
-        $this->authorize('cancel', $order);
-
-        if ($order->status !== Order::STATUS_NEW) {
-            return back()->with('error', 'Можно отменить только новый заказ');
+        // Проверяем, что заказ принадлежит текущему пользователю
+        if ($order->user_id !== Auth::id()) {
+            abort(403);
         }
 
-        try {
-            $order->update(['status' => Order::STATUS_CANCELLED]);
-
-            return back()->with('success', 'Заказ отменён');
-        } catch (\Exception $e) {
-            return back()->with('error', 'Ошибка отмены заказа');
-        }
+        return view('orders.show', compact('order'));
     }
 }
