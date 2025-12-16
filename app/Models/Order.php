@@ -5,52 +5,88 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Order extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'user_id',
+        'order_number',
         'status',
-        'total_price',
+        'total_amount',
+        'customer_name',
+        'customer_phone',
+        'customer_email',
         'delivery_address',
-        'comment',
+        'notes',
     ];
 
     protected $casts = [
-        'total_price' => 'integer',
-        'status' => 'string',
+        'user_id' => 'integer',
+        'total_amount' => 'integer',
     ];
 
     // Статусы заказа
-    public const STATUS_NEW = 'new';
-    public const STATUS_PAID = 'paid';
-    public const STATUS_SHIPPED = 'shipped';
-    public const STATUS_DELIVERED = 'delivered';
-    public const STATUS_CANCELLED = 'cancelled';
+    const STATUS_NEW = 'new';
+    const STATUS_CONFIRMED = 'confirmed';
+    const STATUS_PAID = 'paid';
+    const STATUS_SHIPPED = 'shipped';
+    const STATUS_DELIVERED = 'delivered';
+    const STATUS_CANCELLED = 'cancelled';
 
-    public static function statuses(): array
-    {
-        return [
-            self::STATUS_NEW => 'Новый',
-            self::STATUS_PAID => 'Оплачен',
-            self::STATUS_SHIPPED => 'Отправлен',
-            self::STATUS_DELIVERED => 'Доставлен',
-            self::STATUS_CANCELLED => 'Отменён',
-        ];
-    }
-
-    // Отношения
+    /**
+     * Пользователь заказа
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Товары в заказе
+     */
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
     }
 
-    // Scopes
+    /**
+     * Генерация уникального номера заказа
+     */
+    public static function generateOrderNumber(): string
+    {
+        return 'ORD-' . strtoupper(uniqid());
+    }
+
+    /**
+     * Форматированная сумма заказа
+     */
+    public function getFormattedTotalAttribute(): string
+    {
+        return number_format($this->total_amount, 0, ',', ' ') . ' ₽';
+    }
+
+    /**
+     * Название статуса на русском
+     */
+    public function getStatusNameAttribute(): string
+    {
+        return match($this->status) {
+            self::STATUS_NEW => 'Новый',
+            self::STATUS_CONFIRMED => 'Подтверждён',
+            self::STATUS_PAID => 'Оплачен',
+            self::STATUS_SHIPPED => 'Отправлен',
+            self::STATUS_DELIVERED => 'Доставлен',
+            self::STATUS_CANCELLED => 'Отменён',
+            default => 'Неизвестно',
+        };
+    }
+
+    /**
+     * Scopes для фильтрации по статусу
+     */
     public function scopeNew($query)
     {
         return $query->where('status', self::STATUS_NEW);
@@ -61,31 +97,8 @@ class Order extends Model
         return $query->where('status', self::STATUS_PAID);
     }
 
-    public function scopeForUser($query, int $userId)
+    public function scopeDelivered($query)
     {
-        return $query->where('user_id', $userId);
-    }
-
-    // Аксессоры
-    public function getFormattedTotalAttribute(): string
-    {
-        return number_format($this->total_price, 0, ',', ' ') . ' ₽';
-    }
-
-    public function getStatusLabelAttribute(): string
-    {
-        return self::statuses()[$this->status] ?? $this->status;
-    }
-
-    public function getStatusColorAttribute(): string
-    {
-        return match($this->status) {
-            self::STATUS_NEW => 'blue',
-            self::STATUS_PAID => 'yellow',
-            self::STATUS_SHIPPED => 'purple',
-            self::STATUS_DELIVERED => 'green',
-            self::STATUS_CANCELLED => 'red',
-            default => 'gray',
-        };
+        return $query->where('status', self::STATUS_DELIVERED);
     }
 }

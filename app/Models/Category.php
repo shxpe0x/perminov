@@ -4,44 +4,44 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Str;
 
 class Category extends Model
 {
-    protected $fillable = ['name', 'slug', 'description'];
+    protected $fillable = ['name', 'slug', 'description', 'parent_id'];
 
     protected $casts = [
-        'name' => 'string',
-        'slug' => 'string',
+        'parent_id' => 'integer',
     ];
 
-    // Автоматически генерируем slug при создании
-    protected static function boot()
-    {
-        parent::boot();
-
-        static::creating(function ($category) {
-            if (empty($category->slug)) {
-                $category->slug = Str::slug($category->name);
-            }
-        });
-    }
-
-    // Отношение: категория имеет много товаров
+    /**
+     * Продукты в категории
+     */
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
     }
 
-    // Scope для получения категории по slug
-    public function scopeBySlug($query, string $slug)
+    /**
+     * Родительская категория
+     */
+    public function parent()
     {
-        return $query->where('slug', $slug);
+        return $this->belongsTo(Category::class, 'parent_id');
     }
 
-    // Количество товаров в категории
-    public function getProductsCountAttribute(): int
+    /**
+     * Дочерние категории
+     */
+    public function children(): HasMany
     {
-        return $this->products()->count();
+        return $this->hasMany(Category::class, 'parent_id');
+    }
+
+    /**
+     * Scope для корневых категорий
+     */
+    public function scopeRoot($query)
+    {
+        return $query->whereNull('parent_id');
     }
 }

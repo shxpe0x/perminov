@@ -7,39 +7,50 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Review extends Model
 {
-    protected $fillable = ['user_id', 'product_id', 'rating', 'comment'];
-
-    protected $casts = [
-        'rating' => 'integer',
-        'user_id' => 'integer',
-        'product_id' => 'integer',
+    protected $fillable = [
+        'user_id',
+        'product_id',
+        'rating',
+        'comment',
+        'is_approved',
     ];
 
-    // Отношения
+    protected $casts = [
+        'user_id' => 'integer',
+        'product_id' => 'integer',
+        'rating' => 'integer',
+        'is_approved' => 'boolean',
+    ];
+
+    /**
+     * Пользователь
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Товар
+     */
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
     }
 
-    // Scopes
-    public function scopeForProduct($query, int $productId)
+    /**
+     * Scope для одобренных отзывов
+     */
+    public function scopeApproved($query)
     {
-        return $query->where('product_id', $productId);
+        return $query->where('is_approved', true);
     }
 
-    public function scopeRecent($query)
+    /**
+     * Scope для ожидающих модерации
+     */
+    public function scopePending($query)
     {
-        return $query->orderByDesc('created_at');
-    }
-
-    // Валидация рейтинга
-    public static function validRatings(): array
-    {
-        return [1, 2, 3, 4, 5];
+        return $query->where('is_approved', false);
     }
 }

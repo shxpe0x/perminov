@@ -14,20 +14,19 @@ class Favorite extends Model
         'product_id' => 'integer',
     ];
 
-    // Отношения
+    /**
+     * Пользователь
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Товар
+     */
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
-    }
-
-    // Scope для пользователя
-    public function scopeForUser($query, int $userId)
-    {
-        return $query->where('user_id', $userId);
     }
 }
