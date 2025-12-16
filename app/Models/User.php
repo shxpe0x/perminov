@@ -16,8 +16,6 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'phone',
-        // email оставляем в БД (трогать миграции create_users_table на SQLite больно),
-        // но в UI не используем; будем генерить автоматически из phone.
         'email',
         'password',
     ];
@@ -40,5 +38,30 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_admin' => 'boolean',
         ];
+    }
+
+    /**
+     * Проверка, является ли пользователь администратором
+     */
+    public function isAdmin(): bool
+    {
+        return (bool) $this->is_admin;
+    }
+
+    /**
+     * Форматированный номер телефона
+     */
+    public function getFormattedPhoneAttribute(): string
+    {
+        if (empty($this->phone)) {
+            return '';
+        }
+
+        // Предполагаем формат +7XXXXXXXXXX
+        if (preg_match('/^(\+?7)(\d{3})(\d{3})(\d{2})(\d{2})$/', $this->phone, $matches)) {
+            return "{$matches[1]} ({$matches[2]}) {$matches[3]}-{$matches[4]}-{$matches[5]}";
+        }
+
+        return $this->phone;
     }
 }
