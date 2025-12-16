@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CreateOrderRequest;
 use App\Models\Order;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -59,16 +59,10 @@ class OrderController extends Controller
     }
 
     /**
-     * Создать заказ
+     * Новый Заказ
      */
-    public function store(Request $request)
+    public function store(CreateOrderRequest $request)
     {
-        $request->validate([
-            'delivery_address' => ['required', 'string', 'max:500'],
-            'phone' => ['required', 'string', 'max:20'],
-            'comment' => ['nullable', 'string', 'max:1000'],
-        ]);
-
         try {
             $cart = auth()->user()->cart()->with('items.product')->first();
 
@@ -85,7 +79,7 @@ class OrderController extends Controller
 
             DB::beginTransaction();
 
-            // Создаём заказ
+            // Создаэм заказ
             $order = Order::create([
                 'user_id' => auth()->id(),
                 'status' => Order::STATUS_NEW,
