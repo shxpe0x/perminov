@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -16,6 +17,7 @@ class User extends Authenticatable
         'phone',
         'email',
         'password',
+        'is_blocked',
     ];
 
     protected $hidden = [
@@ -29,42 +31,68 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'is_blocked' => 'boolean',
         ];
     }
 
-    // Отношения
-    public function cartItems(): HasMany
+    /**
+     * Корзина пользователя
+     */
+    public function cart(): HasOne
     {
-        return $this->hasMany(CartItem::class);
+        return $this->hasOne(Cart::class);
     }
 
+    /**
+     * Заказы пользователя
+     */
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
     }
 
+    /**
+     * Избранные товары
+     */
     public function favorites(): HasMany
     {
         return $this->hasMany(Favorite::class);
     }
 
+    /**
+     * Отзывы пользователя
+     */
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
     }
 
-    // Методы
+    /**
+     * Проверка, является ли пользователь администратором
+     */
     public function isAdmin(): bool
     {
         return (bool) $this->is_admin;
     }
 
+    /**
+     * Проверка, заблокирован ли пользователь
+     */
+    public function isBlocked(): bool
+    {
+        return (bool) $this->is_blocked;
+    }
+
+    /**
+     * Форматированный номер телефона
+     */
     public function getFormattedPhoneAttribute(): string
     {
         if (empty($this->phone)) {
             return '';
         }
 
+        // Предполагаем формат +7XXXXXXXXXX
         if (preg_match('/^(\+?7)(\d{3})(\d{3})(\d{2})(\d{2})$/', $this->phone, $matches)) {
             return "{$matches[1]} ({$matches[2]}) {$matches[3]}-{$matches[4]}-{$matches[5]}";
         }
@@ -72,23 +100,11 @@ class User extends Authenticatable
         return $this->phone;
     }
 
-    // Общая стоимость корзины
-    public function getCartTotalAttribute(): int
+    /**
+     * Получить или создать корзину
+     */
+    public function getOrCreateCart(): Cart
     {
-        return $this->cartItems()->with('product')->get()->sum(function ($item) {
-            return $item->product->price * $item->quantity;
-        });
-    }
-
-    // Количество товаров в корзине
-    public function getCartCountAttribute(): int
-    {
-        return $this->cartItems()->sum('quantity');
-    }
-
-    // Количество заказов
-    public function getOrdersCountAttribute(): int
-    {
-        return $this->orders()->count();
+        return $this->cart ?? $this->cart()->create();
     }
 }
