@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -16,7 +17,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // Создаём админа
-        User::factory()->create([
+        User::create([
             'name' => 'Admin',
             'phone' => '+79999999999',
             'password' => Hash::make('password'),
@@ -24,7 +25,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Создаём обычного юзера
-        User::factory()->create([
+        User::create([
             'name' => 'Test User',
             'phone' => '+79876543210',
             'password' => Hash::make('password'),
@@ -32,20 +33,27 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Создаём категории
-        $categories = [
-            Category::create(['name' => 'Процессоры']),
-            Category::create(['name' => 'Видеокарты']),
-            Category::create(['name' => 'Материнские платы']),
-            Category::create(['name' => 'Оперативная память']),
-            Category::create(['name' => 'Жёсткие диски']),
-            Category::create(['name' => 'SSD']),
-            Category::create(['name' => 'Мониторы']),
-            Category::create(['name' => 'Клавиатуры']),
-            Category::create(['name' => 'Мышки']),
-            Category::create(['name' => 'Наушники']),
+        $categoriesData = [
+            'Процессоры',
+            'Видеокарты',
+            'Материнские платы',
+            'Оперативная память',
+            'Жёсткие диски',
+            'SSD',
+            'Мониторы',
+            'Клавиатуры',
+            'Мышки',
+            'Наушники',
         ];
 
-        // 20 тестовых товаров
+        foreach ($categoriesData as $name) {
+            Category::create([
+                'name' => $name,
+                'slug' => Str::slug($name),
+            ]);
+        }
+
+        // 18 тестовых товаров
         $products = [
             // Процессоры (3)
             ['type' => 'computer', 'brand' => 'Intel', 'model' => 'Core i9-13900K', 'price' => 89999, 'category_id' => 1, 'stock' => 15, 'image' => 'cpu-intel-i9.jpg', 'description' => 'Мощный процессор для игр и работы'],
