@@ -7,6 +7,7 @@ use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Models\Product;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
@@ -25,7 +26,15 @@ class ProductController extends Controller
     public function store(StoreProductRequest $request)
     {
         try {
-            $product = Product::query()->create($request->validated());
+            $data = $request->validated();
+
+            // Загрузка изображения, если есть
+            if ($request->hasFile('image')) {
+                $path = $request->file('image')->store('products', 'public');
+                $data['image'] = $path; // сохраняем относительный путь в БД
+            }
+
+            $product = Product::query()->create($data);
 
             Log::info('Товар создан', [
                 'admin_id' => auth()->id(),
@@ -61,7 +70,20 @@ class ProductController extends Controller
     public function update(UpdateProductRequest $request, Product $product)
     {
         try {
-            $product->update($request->validated());
+            $data = $request->validated();
+
+            // Если загружено новое изображение
+            if ($request->hasFile('image')) {
+                // Удаляем старый файл, если был
+                if ($product->image) {
+                    Storage::disk('public')->delete($product->image);
+                }
+
+                $path = $request->file('image')->store('products', 'public');
+                $data['image'] = $path;
+            }
+
+            $product->update($data);
 
             Log::info('Товар обновлён', [
                 'admin_id' => auth()->id(),
@@ -88,6 +110,12 @@ class ProductController extends Controller
     {
         try {
             $productId = $product->id;
+
+            // Удаляем файл изображения, если есть
+            if ($product->image) {
+                Storage::disk('public')->delete($product->image);
+            }
+
             $product->delete();
 
             Log::info('Товар удалён', [
