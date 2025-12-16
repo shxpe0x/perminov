@@ -9,11 +9,6 @@ class Favorite extends Model
 {
     protected $fillable = ['user_id', 'product_id'];
 
-    protected $casts = [
-        'user_id' => 'integer',
-        'product_id' => 'integer',
-    ];
-
     /**
      * Пользователь
      */

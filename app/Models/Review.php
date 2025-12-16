@@ -7,19 +7,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Review extends Model
 {
-    protected $fillable = [
-        'user_id',
-        'product_id',
-        'rating',
-        'comment',
-        'is_approved',
-    ];
+    protected $fillable = ['user_id', 'product_id', 'rating', 'comment'];
 
     protected $casts = [
-        'user_id' => 'integer',
-        'product_id' => 'integer',
         'rating' => 'integer',
-        'is_approved' => 'boolean',
     ];
 
     /**
@@ -39,18 +30,10 @@ class Review extends Model
     }
 
     /**
-     * Scope для одобренных отзывов
+     * Scope для фильтрации по рейтингу
      */
-    public function scopeApproved($query)
+    public function scopeByRating($query, int $rating)
     {
-        return $query->where('is_approved', true);
-    }
-
-    /**
-     * Scope для ожидающих модерации
-     */
-    public function scopePending($query)
-    {
-        return $query->where('is_approved', false);
+        return $query->where('rating', $rating);
     }
 }

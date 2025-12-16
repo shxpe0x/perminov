@@ -7,14 +7,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Category extends Model
 {
-    protected $fillable = ['name', 'slug', 'description', 'parent_id'];
-
-    protected $casts = [
-        'parent_id' => 'integer',
-    ];
+    protected $fillable = ['name', 'slug', 'description'];
 
     /**
-     * Продукты в категории
+     * Получить все товары категории
      */
     public function products(): HasMany
     {
@@ -22,26 +18,10 @@ class Category extends Model
     }
 
     /**
-     * Родительская категория
+     * Scope для поиска по slug
      */
-    public function parent()
+    public function scopeBySlug($query, string $slug)
     {
-        return $this->belongsTo(Category::class, 'parent_id');
-    }
-
-    /**
-     * Дочерние категории
-     */
-    public function children(): HasMany
-    {
-        return $this->hasMany(Category::class, 'parent_id');
-    }
-
-    /**
-     * Scope для корневых категорий
-     */
-    public function scopeRoot($query)
-    {
-        return $query->whereNull('parent_id');
+        return $query->where('slug', $slug);
     }
 }

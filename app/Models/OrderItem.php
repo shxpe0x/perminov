@@ -7,25 +7,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class OrderItem extends Model
 {
-    protected $fillable = [
-        'order_id',
-        'product_id',
-        'quantity',
-        'price',
-        'product_name',
-        'product_brand',
-        'product_model',
-    ];
+    protected $fillable = ['order_id', 'product_id', 'quantity', 'price'];
 
     protected $casts = [
-        'order_id' => 'integer',
-        'product_id' => 'integer',
         'quantity' => 'integer',
         'price' => 'integer',
     ];
 
     /**
-     * Заказ товара
+     * Заказ, к которому принадлежит элемент
      */
     public function order(): BelongsTo
     {
@@ -33,7 +23,7 @@ class OrderItem extends Model
     }
 
     /**
-     * Товар (может быть удалён, поэтому храним копию данных)
+     * Товар
      */
     public function product(): BelongsTo
     {
@@ -41,26 +31,10 @@ class OrderItem extends Model
     }
 
     /**
-     * Стоимость позиции
+     * Получить сумму за этот элемент
      */
     public function getSubtotalAttribute(): int
     {
         return $this->price * $this->quantity;
-    }
-
-    /**
-     * Форматированная стоимость
-     */
-    public function getFormattedSubtotalAttribute(): string
-    {
-        return number_format($this->subtotal, 0, ',', ' ') . ' ₽';
-    }
-
-    /**
-     * Форматированная цена за единицу
-     */
-    public function getFormattedPriceAttribute(): string
-    {
-        return number_format($this->price, 0, ',', ' ') . ' ₽';
     }
 }

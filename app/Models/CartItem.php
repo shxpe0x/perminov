@@ -7,16 +7,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CartItem extends Model
 {
-    protected $fillable = ['cart_id', 'product_id', 'quantity'];
+    protected $fillable = ['cart_id', 'product_id', 'quantity', 'price'];
 
     protected $casts = [
-        'cart_id' => 'integer',
-        'product_id' => 'integer',
         'quantity' => 'integer',
+        'price' => 'integer',
     ];
 
     /**
-     * Корзина товара
+     * Корзина, к которой принадлежит элемент
      */
     public function cart(): BelongsTo
     {
@@ -32,18 +31,10 @@ class CartItem extends Model
     }
 
     /**
-     * Стоимость позиции (цена * количество)
+     * Получить сумму за этот элемент
      */
     public function getSubtotalAttribute(): int
     {
-        return $this->product->price * $this->quantity;
-    }
-
-    /**
-     * Форматированная стоимость позиции
-     */
-    public function getFormattedSubtotalAttribute(): string
-    {
-        return number_format($this->subtotal, 0, ',', ' ') . ' ₽';
+        return $this->price * $this->quantity;
     }
 }

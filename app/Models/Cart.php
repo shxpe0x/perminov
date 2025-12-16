@@ -8,14 +8,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Cart extends Model
 {
-    protected $fillable = ['user_id', 'session_id'];
-
-    protected $casts = [
-        'user_id' => 'integer',
-    ];
+    protected $fillable = ['user_id'];
 
     /**
-     * Пользователь корзины
+     * Пользователь, которому принадлежит корзина
      */
     public function user(): BelongsTo
     {
@@ -23,7 +19,7 @@ class Cart extends Model
     }
 
     /**
-     * Товары в корзине
+     * Элементы корзины
      */
     public function items(): HasMany
     {
@@ -31,28 +27,20 @@ class Cart extends Model
     }
 
     /**
-     * Общая стоимость корзины
+     * Получить общую стоимость корзины
      */
     public function getTotalAttribute(): int
     {
         return $this->items->sum(function ($item) {
-            return $item->product->price * $item->quantity;
+            return $item->price * $item->quantity;
         });
     }
 
     /**
-     * Количество товаров в корзине
+     * Получить количество товаров в корзине
      */
-    public function getTotalItemsAttribute(): int
+    public function getItemsCountAttribute(): int
     {
         return $this->items->sum('quantity');
-    }
-
-    /**
-     * Форматированная общая стоимость
-     */
-    public function getFormattedTotalAttribute(): string
-    {
-        return number_format($this->total, 0, ',', ' ') . ' ₽';
     }
 }
