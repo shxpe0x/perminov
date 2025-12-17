@@ -1,12 +1,12 @@
 <div x-data="{ show: false }" class="relative">
     <input 
         :type="show ? 'text' : 'password'"
-        {{ $attributes->merge(['class' => 'block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500']) }}
+        {{ $attributes->merge(['class' => 'block w-full pr-10 rounded-md border-gray-600 bg-gray-700 text-gray-100 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500']) }}
     >
     <button 
         type="button"
         @click="show = !show"
-        class="absolute inset-y-0 right-0 flex items-center pr-3"
+        class="absolute inset-y-0 right-0 flex items-center pr-3 z-10"
     >
         <!-- Иконка глаза (открыт) -->
         <svg x-show="!show" class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
