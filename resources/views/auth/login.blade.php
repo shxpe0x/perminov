@@ -22,10 +22,9 @@
 
         <div class="mt-4">
             <x-input-label for="password" value="Пароль" />
-            <x-text-input
+            <x-password-input
                 id="password"
                 class="block mt-1 w-full"
-                type="password"
                 name="password"
                 required
                 autocomplete="current-password"
