@@ -4,8 +4,6 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\User;
-use App\Events\OrderCreated;
-use App\Events\OrderCancelled;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -69,9 +67,6 @@ class OrderService
                 'items_count' => $order->items->count(),
             ]);
 
-            // Event
-            event(new OrderCreated($order));
-
             return $order;
         });
     }
@@ -99,11 +94,6 @@ class OrderService
             'old_status' => $oldStatus,
             'new_status' => $newStatus,
         ]);
-
-        // Event при отмене
-        if ($newStatus === Order::STATUS_CANCELLED) {
-            event(new OrderCancelled($order));
-        }
 
         return $order->fresh();
     }
@@ -142,9 +132,6 @@ class OrderService
                 'order_id' => $order->id,
                 'items_returned' => $order->items->count(),
             ]);
-
-            // Event
-            event(new OrderCancelled($order));
 
             return $order->fresh();
         });
