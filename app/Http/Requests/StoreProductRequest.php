@@ -11,7 +11,7 @@ class StoreProductRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->isAdmin() ?? false;
     }
 
     /**
@@ -25,36 +25,36 @@ class StoreProductRequest extends FormRequest
             'type' => 'required|in:computer,peripheral',
             'brand' => 'required|string|max:255',
             'model' => 'required|string|max:255',
-            'price' => 'required|numeric|min:0|max:9999999',
+            'price' => 'required|integer|min:0',
+            'stock' => 'required|integer|min:0',
             'description' => 'nullable|string|max:5000',
             'category_id' => 'nullable|exists:categories,id',
-            'image' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048',
+            'image' => 'nullable|image|max:2048|mimes:jpeg,png,jpg,webp,gif',
+            'is_featured' => 'nullable|boolean',
         ];
     }
 
     /**
-     * Get custom error messages for validator errors.
+     * Get custom messages for validator errors.
      *
      * @return array<string, string>
      */
     public function messages(): array
     {
         return [
-            'type.required' => 'Укажите тип товара',
-            'type.in' => 'Тип должен быть: компьютер или периферия',
-            'brand.required' => 'Укажите производителя',
-            'brand.max' => 'Название производителя слишком длинное',
-            'model.required' => 'Укажите модель',
-            'model.max' => 'Название модели слишком длинное',
-            'price.required' => 'Укажите цену',
-            'price.numeric' => 'Цена должна быть числом',
+            'type.required' => 'Тип товара обязателен',
+            'type.in' => 'Тип должен быть computer или peripheral',
+            'brand.required' => 'Бренд обязателен',
+            'model.required' => 'Модель обязательна',
+            'price.required' => 'Цена обязательна',
+            'price.integer' => 'Цена должна быть числом',
             'price.min' => 'Цена не может быть отрицательной',
-            'price.max' => 'Цена слишком высокая',
-            'description.max' => 'Описание слишком длинное',
-            'category_id.exists' => 'Выбранная категория не существует',
+            'stock.required' => 'Количество на складе обязательно',
+            'stock.integer' => 'Количество должно быть числом',
             'image.image' => 'Файл должен быть изображением',
-            'image.mimes' => 'Допустимые форматы: JPEG, JPG, PNG, WEBP',
-            'image.max' => 'Размер изображения не должен превышать 2 МБ',
+            'image.max' => 'Размер изображения не должен превышать 2MB',
+            'image.mimes' => 'Допустимы только форматы: JPEG, PNG, WebP, GIF',
+            'category_id.exists' => 'Выбранная категория не существует',
         ];
     }
 }
