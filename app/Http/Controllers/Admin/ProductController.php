@@ -6,14 +6,22 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Models\Product;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
+use App\Services\ProductService;
 
 class ProductController extends Controller
 {
+    public function __construct(
+        protected ProductService $productService
+    ) {}
+
     public function index()
     {
-        $products = Product::query()->orderByDesc('id')->paginate(10);
+        // Eager loading и withCount для оптимизации
+        $products = Product::query()
+            ->with('category')
+            ->withCount('reviews')
+            ->orderByDesc('id')
+            ->paginate(10);
 
         return view('admin.products.index', compact('products'));
     }
@@ -27,32 +35,17 @@ class ProductController extends Controller
     {
         try {
             $data = $request->validated();
-
-            // Загрузка изображения, если есть
-            if ($request->hasFile('image')) {
-                $path = $request->file('image')->store('products', 'public');
-                $data['image'] = $path; // сохраняем относительный путь в БД
-            }
-
-            $product = Product::query()->create($data);
-
-            Log::info('Товар создан', [
-                'admin_id' => auth()->id(),
-                'product_id' => $product->id,
-            ]);
+            
+            // Используем ProductService
+            $product = $this->productService->createProduct($data);
 
             return redirect()
                 ->route('products.index')
                 ->with('success', 'Товар добавлен.');
         } catch (\Exception $e) {
-            Log::error('Ошибка создания товара', [
-                'admin_id' => auth()->id(),
-                'error' => $e->getMessage(),
-            ]);
-
             return back()
                 ->withInput()
-                ->with('error', 'Ошибка при создании товара. Попробуйте снова.');
+                ->with('error', 'Ошибка при создании товара: ' . $e->getMessage());
         }
     }
 
@@ -71,70 +64,32 @@ class ProductController extends Controller
     {
         try {
             $data = $request->validated();
-
-            // Если загружено новое изображение
-            if ($request->hasFile('image')) {
-                // Удаляем старый файл, если был
-                if ($product->image) {
-                    Storage::disk('public')->delete($product->image);
-                }
-
-                $path = $request->file('image')->store('products', 'public');
-                $data['image'] = $path;
-            }
-
-            $product->update($data);
-
-            Log::info('Товар обновлён', [
-                'admin_id' => auth()->id(),
-                'product_id' => $product->id,
-            ]);
+            
+            // Используем ProductService
+            $product = $this->productService->updateProduct($product, $data);
 
             return redirect()
                 ->route('products.index')
                 ->with('success', 'Товар обновлён.');
         } catch (\Exception $e) {
-            Log::error('Ошибка обновления товара', [
-                'admin_id' => auth()->id(),
-                'product_id' => $product->id,
-                'error' => $e->getMessage(),
-            ]);
-
             return back()
                 ->withInput()
-                ->with('error', 'Ошибка при обновлении товара. Попробуйте снова.');
+                ->with('error', 'Ошибка при обновлении товара: ' . $e->getMessage());
         }
     }
 
     public function destroy(Product $product)
     {
         try {
-            $productId = $product->id;
-
-            // Удаляем файл изображения, если есть
-            if ($product->image) {
-                Storage::disk('public')->delete($product->image);
-            }
-
-            $product->delete();
-
-            Log::info('Товар удалён', [
-                'admin_id' => auth()->id(),
-                'product_id' => $productId,
-            ]);
+            // Используем ProductService
+            $this->productService->deleteProduct($product);
 
             return redirect()
                 ->route('products.index')
                 ->with('success', 'Товар удалён.');
         } catch (\Exception $e) {
-            Log::error('Ошибка удаления товара', [
-                'admin_id' => auth()->id(),
-                'product_id' => $product->id,
-                'error' => $e->getMessage(),
-            ]);
-
             return back()
-                ->with('error', 'Ошибка при удалении товара. Попробуйте снова.');
+                ->with('error', 'Ошибка при удалении товара: ' . $e->getMessage());
         }
     }
 }
