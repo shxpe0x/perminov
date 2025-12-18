@@ -4,62 +4,34 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
-use App\Services\OrderService;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
-    public function __construct(
-        protected OrderService $orderService
-    ) {}
-
-    // Список всех заказов
-    public function index(Request $request)
+    public function index()
     {
-        $request->validate([
-            'status' => ['nullable', Rule::in(array_keys(Order::statuses()))],
-        ]);
+        $orders = Order::with('user')
+            ->latest()
+            ->paginate(20);
 
-        $query = Order::query()
-            ->with('user', 'items')
-            ->orderByDesc('created_at');
-
-        if ($status = $request->query('status')) {
-            $query->where('status', $status);
-        }
-
-        $orders = $query->paginate(20);
-        $statuses = Order::statuses();
-
-        return view('admin.orders.index', compact('orders', 'statuses'));
+        return view('admin.orders.index', compact('orders'));
     }
 
-    // Просмотр заказа
     public function show(Order $order)
     {
-        // Используем OrderService для eager loading
-        $order = $this->orderService->getOrderWithDetails($order);
-
+        $order->load(['user', 'items.product']);
         return view('admin.orders.show', compact('order'));
     }
 
-    // Обновить статус
     public function updateStatus(Request $request, Order $order)
     {
-        $request->validate([
-            'status' => ['required', Rule::in(array_keys(Order::statuses()))],
+        $validated = $request->validate([
+            'status' => 'required|in:pending,processing,shipped,completed,cancelled',
         ]);
 
-        try {
-            // Используем OrderService
-            $this->orderService->updateOrderStatus($order, $request->input('status'));
+        $order->update($validated);
 
-            return back()->with('success', 'Статус заказа обновлён');
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return back()->withErrors($e->errors());
-        } catch (\Exception $e) {
-            return back()->with('error', 'Ошибка обновления статуса: ' . $e->getMessage());
-        }
+        return redirect()->back()
+            ->with('success', 'Статус заказа обновлен');
     }
 }

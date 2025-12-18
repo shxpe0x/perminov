@@ -3,26 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreProductRequest;
-use App\Http\Requests\UpdateProductRequest;
 use App\Models\Product;
-use App\Services\ProductService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
-    public function __construct(
-        protected ProductService $productService
-    ) {}
-
     public function index()
     {
-        // Eager loading и withCount для оптимизации
-        $products = Product::query()
-            ->with('category')
-            ->withCount('reviews')
-            ->orderByDesc('id')
-            ->paginate(10);
-
+        $products = Product::latest()->paginate(20);
         return view('admin.products.index', compact('products'));
     }
 
@@ -31,28 +20,29 @@ class ProductController extends Controller
         return view('admin.products.create');
     }
 
-    public function store(StoreProductRequest $request)
+    public function store(Request $request)
     {
-        try {
-            $data = $request->validated();
-            
-            // Используем ProductService
-            $product = $this->productService->createProduct($data);
+        $validated = $request->validate([
+            'type' => 'required|in:computer,keyboard,mouse,headphones,monitor,webcam,speaker',
+            'brand' => 'required|string|max:255',
+            'model' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'stock' => 'required|integer|min:0',
+            'description' => 'nullable|string',
+            'image' => 'nullable|image|max:2048',
+            'is_featured' => 'boolean',
+        ]);
 
-            return redirect()
-                ->route('products.index')
-                ->with('success', 'Товар добавлен.');
-        } catch (\Exception $e) {
-            return back()
-                ->withInput()
-                ->with('error', 'Ошибка при создании товара: ' . $e->getMessage());
+        if ($request->hasFile('image')) {
+            $validated['image'] = $request->file('image')->store('products', 'public');
         }
-    }
 
-    public function show(Product $product)
-    {
-        return redirect()
-            ->route('products.edit', $product);
+        $validated['is_featured'] = $request->has('is_featured');
+
+        Product::create($validated);
+
+        return redirect()->route('admin.products.index')
+            ->with('success', 'Товар успешно создан');
     }
 
     public function edit(Product $product)
@@ -60,36 +50,43 @@ class ProductController extends Controller
         return view('admin.products.edit', compact('product'));
     }
 
-    public function update(UpdateProductRequest $request, Product $product)
+    public function update(Request $request, Product $product)
     {
-        try {
-            $data = $request->validated();
-            
-            // Используем ProductService
-            $product = $this->productService->updateProduct($product, $data);
+        $validated = $request->validate([
+            'type' => 'required|in:computer,keyboard,mouse,headphones,monitor,webcam,speaker',
+            'brand' => 'required|string|max:255',
+            'model' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'stock' => 'required|integer|min:0',
+            'description' => 'nullable|string',
+            'image' => 'nullable|image|max:2048',
+            'is_featured' => 'boolean',
+        ]);
 
-            return redirect()
-                ->route('products.index')
-                ->with('success', 'Товар обновлён.');
-        } catch (\Exception $e) {
-            return back()
-                ->withInput()
-                ->with('error', 'Ошибка при обновлении товара: ' . $e->getMessage());
+        if ($request->hasFile('image')) {
+            if ($product->image) {
+                Storage::disk('public')->delete($product->image);
+            }
+            $validated['image'] = $request->file('image')->store('products', 'public');
         }
+
+        $validated['is_featured'] = $request->has('is_featured');
+
+        $product->update($validated);
+
+        return redirect()->route('admin.products.index')
+            ->with('success', 'Товар успешно обновлен');
     }
 
     public function destroy(Product $product)
     {
-        try {
-            // Используем ProductService
-            $this->productService->deleteProduct($product);
-
-            return redirect()
-                ->route('products.index')
-                ->with('success', 'Товар удалён.');
-        } catch (\Exception $e) {
-            return back()
-                ->with('error', 'Ошибка при удалении товара: ' . $e->getMessage());
+        if ($product->image) {
+            Storage::disk('public')->delete($product->image);
         }
+
+        $product->delete();
+
+        return redirect()->route('admin.products.index')
+            ->with('success', 'Товар успешно удален');
     }
 }

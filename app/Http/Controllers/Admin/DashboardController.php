@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Order;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
@@ -16,36 +17,23 @@ class DashboardController extends Controller
             'total_products' => Product::count(),
             'total_orders' => Order::count(),
             'total_users' => User::count(),
-            'total_revenue' => Order::where('status', '!=', 'cancelled')->sum('total'),
             'pending_orders' => Order::where('status', 'pending')->count(),
-            'low_stock_products' => Product::where('stock', '<', 10)->where('stock', '>', 0)->count(),
-            'out_of_stock_products' => Product::where('stock', 0)->count(),
+            'total_revenue' => Order::whereIn('status', ['completed', 'processing', 'shipped'])->sum('total'),
+            'low_stock_products' => Product::where('stock', '<=', 5)->count(),
         ];
 
-        // Recent orders
-        $recentOrders = Order::with('user')
+        $recent_orders = Order::with('user')
             ->latest()
             ->take(10)
             ->get();
 
-        // Low stock products
-        $lowStockProducts = Product::where('stock', '<', 10)
-            ->where('stock', '>', 0)
-            ->orderBy('stock')
-            ->take(10)
+        $top_products = Product::select('products.*', DB::raw('COUNT(order_items.id) as orders_count'))
+            ->leftJoin('order_items', 'products.id', '=', 'order_items.product_id')
+            ->groupBy('products.id')
+            ->orderBy('orders_count', 'desc')
+            ->take(5)
             ->get();
 
-        // Orders by status
-        $ordersByStatus = Order::select('status', DB::raw('count(*) as count'))
-            ->groupBy('status')
-            ->get()
-            ->pluck('count', 'status');
-
-        return view('admin.dashboard', compact(
-            'stats',
-            'recentOrders',
-            'lowStockProducts',
-            'ordersByStatus'
-        ));
+        return view('admin.dashboard', compact('stats', 'recent_orders', 'top_products'));
     }
 }
