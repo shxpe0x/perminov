@@ -15,14 +15,17 @@
                     <x-nav-link :href="route('catalog.index')" :active="request()->routeIs('catalog.*')">
                         Каталог
                     </x-nav-link>
+                    @auth
                     <x-nav-link :href="route('orders.index')" :active="request()->routeIs('orders.*')">
                         Мои заказы
                     </x-nav-link>
+                    @endauth
                 </div>
             </div>
 
             <!-- Right Side: Cart & User -->
             <div class="hidden sm:flex sm:items-center sm:gap-4">
+                @auth
                 <!-- Cart Icon -->
                 <a href="{{ route('cart.index') }}" 
                    x-data="cart"
@@ -67,6 +70,17 @@
                         </form>
                     </x-slot>
                 </x-dropdown>
+                @else
+                <!-- Guest Links -->
+                <div class="flex items-center gap-4">
+                    <a href="{{ route('login') }}" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition">
+                        Вход
+                    </a>
+                    <a href="{{ route('register') }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+                        Регистрация
+                    </a>
+                </div>
+                @endauth
             </div>
 
             <!-- Hamburger -->
@@ -87,14 +101,17 @@
             <x-responsive-nav-link :href="route('catalog.index')" :active="request()->routeIs('catalog.*')">
                 Каталог
             </x-responsive-nav-link>
+            @auth
             <x-responsive-nav-link :href="route('orders.index')" :active="request()->routeIs('orders.*')">
                 Мои заказы
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('cart.index')" :active="request()->routeIs('cart.*')">
                 Корзина
             </x-responsive-nav-link>
+            @endauth
         </div>
 
+        @auth
         <!-- Responsive Settings Options -->
         <div class="pt-4 pb-1 border-t border-gray-200 dark:border-gray-600">
             <div class="px-4">
@@ -119,5 +136,18 @@
                 </form>
             </div>
         </div>
+        @else
+        <!-- Guest Links Mobile -->
+        <div class="pt-4 pb-1 border-t border-gray-200 dark:border-gray-600">
+            <div class="space-y-1">
+                <x-responsive-nav-link :href="route('login')">
+                    Вход
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('register')">
+                    Регистрация
+                </x-responsive-nav-link>
+            </div>
+        </div>
+        @endauth
     </div>
 </nav>
