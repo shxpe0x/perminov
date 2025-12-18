@@ -17,7 +17,7 @@
                                 Найдено товаров: <span class="font-semibold text-gray-900 dark:text-white">{{ $products->total() }}</span>
                             </div>
                             
-                            <form method="GET" action="{{ route('catalog.index') }}" class="flex items-center gap-3">
+                            <form method="GET" action="{{ route('catalog.index') }}" class="flex items-center gap-3" id="sortForm">
                                 <!-- Preserve filters -->
                                 @if(request('type'))
                                     <input type="hidden" name="type" value="{{ request('type') }}">
@@ -37,17 +37,22 @@
                                 @if(request('in_stock'))
                                     <input type="hidden" name="in_stock" value="{{ request('in_stock') }}">
                                 @endif
+                                @if(request('brands'))
+                                    @foreach(request('brands') as $brand)
+                                        <input type="hidden" name="brands[]" value="{{ $brand }}">
+                                    @endforeach
+                                @endif
                                 
                                 <label class="text-sm text-gray-600 dark:text-gray-400">Сортировка:</label>
                                 <select name="sort" 
                                         onchange="this.form.submit()"
                                         class="text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-blue-500 focus:ring-blue-500">
-                                    <option value="default" @selected(($sort ?? 'default') === 'default')>По умолчанию</option>
-                                    <option value="price_asc" @selected(($sort ?? 'default') === 'price_asc')>Цена: по возрастанию</option>
-                                    <option value="price_desc" @selected(($sort ?? 'default') === 'price_desc')>Цена: по убыванию</option>
-                                    <option value="name_asc" @selected(($sort ?? 'default') === 'name_asc')>Название: А-Я</option>
-                                    <option value="name_desc" @selected(($sort ?? 'default') === 'name_desc')>Название: Я-А</option>
-                                    <option value="newest" @selected(($sort ?? 'default') === 'newest')>Сначала новые</option>
+                                    <option value="default" @selected((request('sort', 'default')) === 'default')>По умолчанию</option>
+                                    <option value="price_asc" @selected((request('sort', 'default')) === 'price_asc')>Цена: по возрастанию</option>
+                                    <option value="price_desc" @selected((request('sort', 'default')) === 'price_desc')>Цена: по убыванию</option>
+                                    <option value="name_asc" @selected((request('sort', 'default')) === 'name_asc')>Название: А-Я</option>
+                                    <option value="name_desc" @selected((request('sort', 'default')) === 'name_desc')>Название: Я-А</option>
+                                    <option value="newest" @selected((request('sort', 'default')) === 'newest')>Сначала новые</option>
                                 </select>
                             </form>
                         </div>
@@ -99,7 +104,10 @@
                 <!-- Filters Sidebar (Right) -->
                 <div class="w-80 flex-shrink-0">
                     <div class="sticky top-6">
-                        <form method="GET" action="{{ route('catalog.index') }}" class="space-y-6">
+                        <form method="GET" action="{{ route('catalog.index') }}" id="filtersForm" class="space-y-6">
+                            <!-- Preserve sort -->
+                            <input type="hidden" name="sort" value="{{ request('sort', 'default') }}">
+                            
                             <!-- Search -->
                             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
                                 <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-3">
@@ -107,7 +115,7 @@
                                 </label>
                                 <input type="text" 
                                        name="q" 
-                                       value="{{ $q ?? '' }}" 
+                                       value="{{ request('q', '') }}" 
                                        placeholder="Бренд или модель..."
                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-blue-500 focus:ring-blue-500">
                             </div>
@@ -119,7 +127,7 @@
                                 </label>
                                 
                                 <div class="space-y-2">
-                                    <label class="flex items-center">
+                                    <label class="flex items-center cursor-pointer">
                                         <input type="radio" 
                                                name="type" 
                                                value="" 
@@ -128,7 +136,7 @@
                                         <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Все товары</span>
                                     </label>
                                     
-                                    <label class="flex items-center">
+                                    <label class="flex items-center cursor-pointer">
                                         <input type="radio" 
                                                name="type" 
                                                value="computer" 
@@ -142,7 +150,7 @@
                                 <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                                     <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Периферия</div>
                                     <div class="space-y-2">
-                                        <label class="flex items-center">
+                                        <label class="flex items-center cursor-pointer">
                                             <input type="radio" 
                                                    name="type" 
                                                    value="keyboard" 
@@ -151,7 +159,7 @@
                                             <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">⌨️ Клавиатуры</span>
                                         </label>
                                         
-                                        <label class="flex items-center">
+                                        <label class="flex items-center cursor-pointer">
                                             <input type="radio" 
                                                    name="type" 
                                                    value="mouse" 
@@ -160,7 +168,7 @@
                                             <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">🖱️ Мыши</span>
                                         </label>
                                         
-                                        <label class="flex items-center">
+                                        <label class="flex items-center cursor-pointer">
                                             <input type="radio" 
                                                    name="type" 
                                                    value="headphones" 
@@ -169,7 +177,7 @@
                                             <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">🎧 Наушники</span>
                                         </label>
                                         
-                                        <label class="flex items-center">
+                                        <label class="flex items-center cursor-pointer">
                                             <input type="radio" 
                                                    name="type" 
                                                    value="monitor" 
@@ -178,7 +186,7 @@
                                             <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">🖥️ Мониторы</span>
                                         </label>
                                         
-                                        <label class="flex items-center">
+                                        <label class="flex items-center cursor-pointer">
                                             <input type="radio" 
                                                    name="type" 
                                                    value="webcam" 
@@ -187,7 +195,7 @@
                                             <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">📷 Веб-камеры</span>
                                         </label>
                                         
-                                        <label class="flex items-center">
+                                        <label class="flex items-center cursor-pointer">
                                             <input type="radio" 
                                                    name="type" 
                                                    value="speaker" 
@@ -233,7 +241,7 @@
                                 </label>
                             </div>
                             
-                            <!-- Brand Filter (if you have brands) -->
+                            <!-- Brand Filter -->
                             @if(isset($brands) && $brands->count() > 0)
                             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
                                 <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-3">
@@ -241,7 +249,7 @@
                                 </label>
                                 <div class="space-y-2 max-h-48 overflow-y-auto">
                                     @foreach($brands as $brand)
-                                        <label class="flex items-center">
+                                        <label class="flex items-center cursor-pointer">
                                             <input type="checkbox" 
                                                    name="brands[]" 
                                                    value="{{ $brand }}" 
@@ -258,11 +266,13 @@
                             <div class="flex gap-3">
                                 <button type="submit" 
                                         class="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition">
-                                    Применить
+                                    Применить фильтры
                                 </button>
                                 <a href="{{ route('catalog.index') }}" 
-                                   class="px-4 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-lg transition text-center">
-                                    ✕
+                                   class="px-4 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-lg transition text-center flex items-center justify-center">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
                                 </a>
                             </div>
                         </form>
