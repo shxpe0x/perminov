@@ -15,13 +15,13 @@ class CartController extends Controller
      */
     public function index()
     {
-        $cart = Auth::user()->cart()->with(['items.product.category'])->first();
+        $cart = Auth::user()->cart()->with(['items.product'])->first();
         
         return view('cart.index', compact('cart'));
     }
 
     /**
-     * Add product to cart (AJAX).
+     * Add product to cart.
      */
     public function add(Request $request)
     {
@@ -35,9 +35,7 @@ class CartController extends Controller
 
         // Check stock
         if ($product->stock < $quantity) {
-            return response()->json([
-                'message' => 'Недостаточно товара на складе',
-            ], 400);
+            return back()->with('error', 'Недостаточно товара на складе');
         }
 
         // Get or create cart
@@ -53,9 +51,7 @@ class CartController extends Controller
             // Check if we can add more
             $newQuantity = $cartItem->quantity + $quantity;
             if ($newQuantity > $product->stock) {
-                return response()->json([
-                    'message' => 'Недостаточно товара на складе. В корзине уже ' . $cartItem->quantity . ' шт.',
-                ], 400);
+                return back()->with('error', 'Недостаточно товара на складе. В корзине уже ' . $cartItem->quantity . ' шт.');
             }
             $cartItem->update(['quantity' => $newQuantity]);
         } else {
@@ -63,17 +59,11 @@ class CartController extends Controller
             $cart->items()->create([
                 'product_id' => $product->id,
                 'quantity' => $quantity,
-                'price' => $product->price, // Сохраняем текущую цену
+                'price' => $product->price,
             ]);
         }
 
-        // Refresh cart to get updated items
-        $cart->load('items');
-
-        return response()->json([
-            'message' => 'Товар добавлен в корзину',
-            'count' => $cart->items->sum('quantity'),
-        ]);
+        return back()->with('success', 'Товар добавлен в корзину!');
     }
 
     /**
