@@ -46,6 +46,8 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    // Scopes
+
     /**
      * Scope для фильтрации по статусу
      */
@@ -61,6 +63,74 @@ class Order extends Model
     {
         return $query->where('status', self::STATUS_NEW);
     }
+
+    /**
+     * Scope для получения последних заказов
+     */
+    public function scopeRecent($query)
+    {
+        return $query->orderByDesc('created_at');
+    }
+
+    /**
+     * Scope для фильтрации по конкретному статусу
+     */
+    public function scopeStatus($query, string $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    // Методы проверки статуса
+
+    /**
+     * Новый заказ (ожидает оплаты)
+     */
+    public function isPending(): bool
+    {
+        return $this->status === self::STATUS_NEW;
+    }
+
+    /**
+     * Заказ в обработке (оплачен)
+     */
+    public function isProcessing(): bool
+    {
+        return $this->status === self::STATUS_PAID;
+    }
+
+    /**
+     * Заказ отправлен
+     */
+    public function isShipped(): bool
+    {
+        return $this->status === self::STATUS_SHIPPED;
+    }
+
+    /**
+     * Заказ доставлен
+     */
+    public function isDelivered(): bool
+    {
+        return $this->status === self::STATUS_DELIVERED;
+    }
+
+    /**
+     * Можно ли отменить заказ
+     */
+    public function isCancellable(): bool
+    {
+        return in_array($this->status, [self::STATUS_NEW, self::STATUS_PAID]);
+    }
+
+    /**
+     * Заказ отменён
+     */
+    public function isCancelled(): bool
+    {
+        return $this->status === self::STATUS_CANCELLED;
+    }
+
+    // Аксессоры
 
     /**
      * Получить человекочитаемый статус
