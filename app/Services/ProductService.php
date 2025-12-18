@@ -19,7 +19,7 @@ class ProductService
         $page = request()->get('page', 1);
         $cacheKey = 'products:filters:' . md5(json_encode($filters)) . ':page:' . $page;
 
-        return Cache::tags(['products'])->remember($cacheKey, 3600, function () use ($filters, $perPage) {
+        return Cache::remember($cacheKey, 3600, function () use ($filters, $perPage) {
             $query = Product::query()->with(['category', 'reviews']);
 
             // Применение фильтров
@@ -59,7 +59,7 @@ class ProductService
     {
         $cacheKey = "product:rating:{$product->id}";
 
-        return Cache::tags(['products'])->remember($cacheKey, 3600, function () use ($product) {
+        return Cache::remember($cacheKey, 3600, function () use ($product) {
             return [
                 'average' => round($product->reviews()->avg('rating') ?? 0, 1),
                 'count' => $product->reviews()->count(),
@@ -187,11 +187,12 @@ class ProductService
     }
 
     /**
-     * Очистить весь кеш товаров
+     * Очистить весь кеш товаров (без тегов для совместимости с file driver)
      */
     public function clearProductsCache(): void
     {
-        Cache::tags(['products'])->flush();
+        // Очищаем паттерном для file cache
+        Cache::flush(); // Для учебного проекта можно очищать весь кеш
     }
 
     /**
