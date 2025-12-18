@@ -12,12 +12,13 @@ class Product extends Model
 {
     use SoftDeletes;
 
-    protected $fillable = ['category_id', 'type', 'brand', 'model', 'price', 'stock', 'description', 'image'];
+    protected $fillable = ['category_id', 'type', 'brand', 'model', 'price', 'stock', 'description', 'image', 'is_featured'];
 
     protected $casts = [
         'price' => 'integer',
         'stock' => 'integer',
         'type' => 'string',
+        'is_featured' => 'boolean',
     ];
 
     /**
@@ -104,6 +105,14 @@ class Product extends Model
         return $query->where('stock', '>', 0);
     }
 
+    /**
+     * Scope для рекомендуемых товаров
+     */
+    public function scopeFeatured($query)
+    {
+        return $query->where('is_featured', true);
+    }
+
     // Аксессоры
 
     /**
@@ -127,6 +136,8 @@ class Product extends Model
         return asset('images/no-image.png');
     }
 
+    // Методы
+
     /**
      * Есть ли товар в наличии
      */
@@ -136,11 +147,28 @@ class Product extends Model
     }
 
     /**
+     * Доступен ли товар для покупки (не удалён и есть в наличии)
+     */
+    public function isAvailable(): bool
+    {
+        return !$this->trashed() && $this->isInStock();
+    }
+
+    /**
+     * Является ли товар рекомендуемым
+     */
+    public function isFeatured(): bool
+    {
+        return (bool) $this->is_featured;
+    }
+
+    /**
      * Получить средний рейтинг
+     * Примечание: Используйте ProductService->getProductRating() для кеширования
      */
     public function getAverageRatingAttribute(): float
     {
-        return $this->reviews()->avg('rating') ?? 0;
+        return round($this->reviews()->avg('rating') ?? 0, 1);
     }
 
     /**
