@@ -41,7 +41,10 @@ class CartController extends Controller
         }
 
         // Get or create cart
-        $cart = Auth::user()->cart()->firstOrCreate([]);
+        $cart = Auth::user()->cart;
+        if (!$cart) {
+            $cart = Auth::user()->cart()->create();
+        }
 
         // Check if product already in cart
         $cartItem = $cart->items()->where('product_id', $product->id)->first();
@@ -56,19 +59,20 @@ class CartController extends Controller
             }
             $cartItem->update(['quantity' => $newQuantity]);
         } else {
-            // Add new item
+            // Add new item with price
             $cart->items()->create([
                 'product_id' => $product->id,
                 'quantity' => $quantity,
+                'price' => $product->price, // Сохраняем текущую цену
             ]);
         }
 
-        // Update cart total
-        $cart->updateTotal();
+        // Refresh cart to get updated items
+        $cart->load('items');
 
         return response()->json([
             'message' => 'Товар добавлен в корзину',
-            'count' => $cart->items()->sum('quantity'),
+            'count' => $cart->items->sum('quantity'),
         ]);
     }
 
@@ -92,7 +96,6 @@ class CartController extends Controller
         }
 
         $item->update(['quantity' => $request->quantity]);
-        $item->cart->updateTotal();
 
         return back()->with('success', 'Количество обновлено');
     }
@@ -107,9 +110,7 @@ class CartController extends Controller
             abort(403);
         }
 
-        $cart = $item->cart;
         $item->delete();
-        $cart->updateTotal();
 
         return back()->with('success', 'Товар удалён из корзины');
     }
@@ -120,7 +121,7 @@ class CartController extends Controller
     public function count()
     {
         $cart = Auth::user()->cart;
-        $count = $cart ? $cart->items()->sum('quantity') : 0;
+        $count = $cart ? $cart->items->sum('quantity') : 0;
 
         return response()->json(['count' => $count]);
     }
@@ -134,7 +135,6 @@ class CartController extends Controller
         
         if ($cart) {
             $cart->items()->delete();
-            $cart->updateTotal();
         }
 
         return back()->with('success', 'Корзина очищена');
