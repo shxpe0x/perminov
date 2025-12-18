@@ -3,45 +3,95 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
-use App\Services\ProductService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class CatalogController extends Controller
 {
-    public function __construct(
-        protected ProductService $productService
-    ) {}
-
     public function index(Request $request)
     {
         $request->validate([
-            'type' => ['nullable', Rule::in(['computer', 'peripheral'])],
+            'type' => ['nullable', Rule::in(['computer', 'keyboard', 'mouse', 'headphones', 'monitor', 'webcam', 'speaker'])],
             'q' => ['nullable', 'string', 'max:100'],
-            'sort' => ['nullable', Rule::in(['id', 'price'])],
-            'dir' => ['nullable', Rule::in(['asc', 'desc'])],
-            'perPage' => ['nullable', 'integer', 'min:5', 'max:50'],
+            'sort' => ['nullable', Rule::in(['default', 'price_asc', 'price_desc', 'name_asc', 'name_desc', 'newest'])],
+            'price_min' => ['nullable', 'numeric', 'min:0'],
+            'price_max' => ['nullable', 'numeric', 'min:0'],
+            'in_stock' => ['nullable', 'boolean'],
+            'brands' => ['nullable', 'array'],
+            'brands.*' => ['string'],
         ]);
 
-        $filters = [
-            'type' => $request->query('type'),
-            'search' => trim((string) $request->query('q', '')),
-            'sort_by' => $request->query('sort', 'id'),
-            'sort_order' => $request->query('dir', 'desc'),
-        ];
+        // Start query
+        $query = Product::query()->with('category');
 
-        $perPage = (int) $request->query('perPage', 10);
+        // Type filter
+        $type = $request->query('type');
+        if ($type) {
+            $query->where('type', $type);
+        }
 
-        // Используем ProductService с кешированием
-        $products = $this->productService->getProductsCached($filters, $perPage);
+        // Search filter
+        $q = trim((string) $request->query('q', ''));
+        if ($q) {
+            $query->where(function ($query) use ($q) {
+                $query->where('brand', 'LIKE', "%{$q}%")
+                      ->orWhere('model', 'LIKE', "%{$q}%")
+                      ->orWhere('description', 'LIKE', "%{$q}%");
+            });
+        }
 
-        // Для совместимости с view
-        $type = $filters['type'];
-        $q = $filters['search'];
-        $sort = $filters['sort_by'];
-        $dir = $filters['sort_order'];
+        // Price range filter
+        if ($request->filled('price_min')) {
+            $query->where('price', '>=', $request->price_min);
+        }
+        if ($request->filled('price_max')) {
+            $query->where('price', '<=', $request->price_max);
+        }
 
-        return view('catalog.index', compact('products', 'type', 'q', 'sort', 'dir', 'perPage'));
+        // Stock filter
+        if ($request->boolean('in_stock')) {
+            $query->where('stock', '>', 0);
+        }
+
+        // Brand filter
+        if ($request->filled('brands')) {
+            $query->whereIn('brand', $request->brands);
+        }
+
+        // Sorting
+        $sort = $request->query('sort', 'default');
+        switch ($sort) {
+            case 'price_asc':
+                $query->orderBy('price', 'asc');
+                break;
+            case 'price_desc':
+                $query->orderBy('price', 'desc');
+                break;
+            case 'name_asc':
+                $query->orderBy('brand', 'asc')->orderBy('model', 'asc');
+                break;
+            case 'name_desc':
+                $query->orderBy('brand', 'desc')->orderBy('model', 'desc');
+                break;
+            case 'newest':
+                $query->orderBy('created_at', 'desc');
+                break;
+            default:
+                $query->orderBy('id', 'desc');
+                break;
+        }
+
+        // Get products with pagination
+        $products = $query->paginate(12)->withQueryString();
+
+        // Get unique brands for filter
+        $brands = Product::query()
+            ->select('brand')
+            ->distinct()
+            ->orderBy('brand')
+            ->pluck('brand');
+
+        return view('catalog.index', compact('products', 'type', 'q', 'sort', 'brands'));
     }
 
     public function show(Product $product)
@@ -49,9 +99,6 @@ class CatalogController extends Controller
         // Eager loading связей
         $product->load(['category', 'reviews.user']);
 
-        // Получаем рейтинг из кеша
-        $rating = $this->productService->getProductRating($product);
-
-        return view('catalog.show', compact('product', 'rating'));
+        return view('catalog.show', compact('product'));
     }
 }
