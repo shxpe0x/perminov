@@ -7,19 +7,23 @@ use App\Services\ProductService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
-class UpdateProductRatingCache implements ShouldQueue
+class UpdateProductRatingCache
 {
-    use InteractsWithQueue;
+    /**
+     * Create the event listener.
+     */
+    public function __construct(
+        protected ProductService $productService
+    ) {
+        //
+    }
 
     /**
      * Handle the event.
      */
     public function handle(ReviewCreated $event): void
     {
-        $review = $event->review;
-        $productService = app(ProductService::class);
-
-        // Обновляем кеш рейтинга
-        $productService->updateProductRating($review->product_id);
+        // Очистить кеш рейтинга товара
+        $this->productService->updateProductRating($event->review->product);
     }
 }
