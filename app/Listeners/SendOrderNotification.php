@@ -3,14 +3,10 @@
 namespace App\Listeners;
 
 use App\Events\OrderCreated;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 
-class SendOrderNotification implements ShouldQueue
+class SendOrderNotification
 {
-    use InteractsWithQueue;
-
     /**
      * Create the event listener.
      */
@@ -24,18 +20,17 @@ class SendOrderNotification implements ShouldQueue
      */
     public function handle(OrderCreated $event): void
     {
-        // Заглушка для отправки email
-        // В будущем можно интегрировать Mail::to($event->order->user->email)
-        
-        Log::info('Отправлено уведомление о создании заказа', [
+        // Логирование создания заказа
+        Log::info('Заказ создан - уведомление', [
             'order_id' => $event->order->id,
             'user_id' => $event->order->user_id,
-            'user_email' => $event->order->user->email,
+            'user_name' => $event->order->user->name,
             'total_price' => $event->order->total_price,
+            'items_count' => $event->order->items->count(),
         ]);
 
-        // TODO: Реализовать отправку email
-        // Mail::to($event->order->user->email)
-        //     ->send(new OrderCreatedMail($event->order));
+        // Для учебного проекта достаточно логирования
+        // В продакшене здесь была бы отправка email:
+        // Mail::to($event->order->user->email)->send(new OrderCreatedMail($event->order));
     }
 }
