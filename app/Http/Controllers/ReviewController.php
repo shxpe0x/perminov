@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\ReviewCreated;
 use App\Http\Requests\StoreReviewRequest;
 use App\Models\Product;
 use App\Models\Review;
@@ -29,7 +30,7 @@ class ReviewController extends Controller
     public function store(StoreReviewRequest $request, Product $product)
     {
         try {
-            Review::query()->updateOrCreate(
+            $review = Review::query()->updateOrCreate(
                 [
                     'user_id' => auth()->id(),
                     'product_id' => $product->id,
@@ -45,6 +46,9 @@ class ReviewController extends Controller
                 'product_id' => $product->id,
                 'rating' => $request->input('rating'),
             ]);
+
+            // Событие для очистки кеша рейтинга
+            event(new ReviewCreated($review));
 
             return back()->with('success', 'Отзыв добавлен');
         } catch (\Exception $e) {
