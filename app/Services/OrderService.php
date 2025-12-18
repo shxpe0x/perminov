@@ -3,64 +3,73 @@
 namespace App\Services;
 
 use App\Models\Order;
-use App\Models\Cart;
+use App\Models\User;
 use App\Events\OrderCreated;
 use App\Events\OrderCancelled;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class OrderService
 {
     /**
      * Создать заказ из корзины
      */
-    public function createOrderFromCart(Cart $cart, array $data): Order
+    public function createOrderFromCart(User $user, array $data): Order
     {
-        if ($cart->items->isEmpty()) {
-            throw new \Exception('Корзина пуста');
-        }
+        return DB::transaction(function () use ($user, $data) {
+            $cart = $user->cart;
 
-        // Проверяем наличие товаров на складе
-        foreach ($cart->items as $item) {
-            if ($item->quantity > $item->product->stock) {
-                throw new \Exception("Товар {$item->product->brand} {$item->product->model} закончился на складе");
+            // Проверка пустой корзины
+            if (!$cart || $cart->items->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'cart' => ['Корзина пуста']
+                ]);
             }
-        }
 
-        return DB::transaction(function () use ($cart, $data) {
-            // Создаём заказ
+            // Проверка наличия товаров
+            foreach ($cart->items as $item) {
+                if ($item->product->stock < $item->quantity) {
+                    throw ValidationException::withMessages([
+                        'stock' => ["Товар '{$item->product->brand} {$item->product->model}' недоступен в нужном количестве"]
+                    ]);
+                }
+            }
+
+            // Создание заказа
             $order = Order::create([
-                'user_id' => $cart->user_id,
+                'user_id' => $user->id,
                 'status' => Order::STATUS_NEW,
-                'total_price' => $cart->total,
+                'total_price' => $cart->total_price,
                 'delivery_address' => $data['delivery_address'],
-                'phone' => $data['phone'],
+                'phone' => $data['phone'] ?? $user->phone,
                 'comment' => $data['comment'] ?? null,
             ]);
 
-            // Копируем товары из корзины в заказ
+            // Копирование товаров из корзины в заказ
             foreach ($cart->items as $item) {
                 $order->items()->create([
                     'product_id' => $item->product_id,
                     'quantity' => $item->quantity,
-                    'price' => $item->price,
+                    'price' => $item->product->price,
                 ]);
 
-                // Уменьшаем остаток на складе
+                // Уменьшение остатка товара
                 $item->product->decrement('stock', $item->quantity);
             }
 
-            // Очищаем корзину
+            // Очистка корзины
             $cart->items()->delete();
 
-            // Логируем создание заказа
+            // Логирование
             Log::info('Заказ создан', [
                 'order_id' => $order->id,
-                'user_id' => $cart->user_id,
+                'user_id' => $user->id,
                 'total_price' => $order->total_price,
+                'items_count' => $order->items->count(),
             ]);
 
-            // Генерируем событие
+            // Event
             event(new OrderCreated($order));
 
             return $order;
@@ -74,68 +83,70 @@ class OrderService
     {
         $oldStatus = $order->status;
 
-        // Валидация статуса
-        $validStatuses = [
-            Order::STATUS_NEW,
-            Order::STATUS_PAID,
-            Order::STATUS_SHIPPED,
-            Order::STATUS_DELIVERED,
-            Order::STATUS_CANCELLED,
-        ];
-
-        if (!in_array($newStatus, $validStatuses)) {
-            throw new \Exception('Недопустимый статус заказа');
-        }
-
-        // Проверка возможности смены статуса
-        if ($order->status === Order::STATUS_CANCELLED) {
-            throw new \Exception('Невозможно изменить статус отменённого заказа');
-        }
-
-        if ($order->status === Order::STATUS_DELIVERED && $newStatus !== Order::STATUS_CANCELLED) {
-            throw new \Exception('Невозможно изменить статус доставленного заказа');
-        }
-
-        DB::transaction(function () use ($order, $newStatus, $oldStatus) {
-            $order->update(['status' => $newStatus]);
-
-            // Если заказ отменяется, возвращаем товары на склад
-            if ($newStatus === Order::STATUS_CANCELLED && $oldStatus !== Order::STATUS_CANCELLED) {
-                foreach ($order->items as $item) {
-                    $item->product->increment('stock', $item->quantity);
-                }
-
-                // Генерируем событие отмены
-                event(new OrderCancelled($order));
-            }
-
-            Log::info('Статус заказа изменён', [
-                'order_id' => $order->id,
-                'old_status' => $oldStatus,
-                'new_status' => $newStatus,
+        // Проверка валидности статуса
+        if (!array_key_exists($newStatus, Order::statuses())) {
+            throw ValidationException::withMessages([
+                'status' => ['Неверный статус заказа']
             ]);
-        });
+        }
+
+        // Обновление
+        $order->update(['status' => $newStatus]);
+
+        // Логирование
+        Log::info('Статус заказа изменён', [
+            'order_id' => $order->id,
+            'old_status' => $oldStatus,
+            'new_status' => $newStatus,
+        ]);
+
+        // Event при отмене
+        if ($newStatus === Order::STATUS_CANCELLED) {
+            event(new OrderCancelled($order));
+        }
 
         return $order->fresh();
     }
 
     /**
-     * Получить заказ с подробностями (eager loading)
+     * Получить заказ с деталями (eager loading)
      */
-    public function getOrderWithDetails(int $orderId): Order
+    public function getOrderWithDetails(Order $order): Order
     {
-        return Order::with(['items.product', 'user'])
-            ->findOrFail($orderId);
+        return $order->load(['items.product', 'user']);
     }
 
     /**
-     * Получить заказы пользователя с пагинацией
+     * Отменить заказ
      */
-    public function getUserOrders(int $userId, int $perPage = 10)
+    public function cancelOrder(Order $order): Order
     {
-        return Order::with(['items.product'])
-            ->where('user_id', $userId)
-            ->orderByDesc('created_at')
-            ->paginate($perPage);
+        // Проверка возможности отмены
+        if (!$order->isCancellable()) {
+            throw ValidationException::withMessages([
+                'order' => ['Заказ нельзя отменить в текущем статусе']
+            ]);
+        }
+
+        return DB::transaction(function () use ($order) {
+            // Возврат товаров на склад
+            foreach ($order->items as $item) {
+                $item->product->increment('stock', $item->quantity);
+            }
+
+            // Смена статуса
+            $order->update(['status' => Order::STATUS_CANCELLED]);
+
+            // Логирование
+            Log::info('Заказ отменён', [
+                'order_id' => $order->id,
+                'items_returned' => $order->items->count(),
+            ]);
+
+            // Event
+            event(new OrderCancelled($order));
+
+            return $order->fresh();
+        });
     }
 }
