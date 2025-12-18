@@ -4,12 +4,16 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Services\OrderService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
+    public function __construct(
+        protected OrderService $orderService
+    ) {}
+
     // Список всех заказов
     public function index(Request $request)
     {
@@ -34,7 +38,8 @@ class OrderController extends Controller
     // Просмотр заказа
     public function show(Order $order)
     {
-        $order->load('user', 'items.product');
+        // Используем OrderService для eager loading
+        $order = $this->orderService->getOrderWithDetails($order);
 
         return view('admin.orders.show', compact('order'));
     }
@@ -47,25 +52,14 @@ class OrderController extends Controller
         ]);
 
         try {
-            $oldStatus = $order->status;
-            $order->update([
-                'status' => $request->input('status'),
-            ]);
-
-            Log::info('Статус заказа обновлён', [
-                'admin_id' => auth()->id(),
-                'order_id' => $order->id,
-                'old_status' => $oldStatus,
-                'new_status' => $order->status,
-            ]);
+            // Используем OrderService
+            $this->orderService->updateOrderStatus($order, $request->input('status'));
 
             return back()->with('success', 'Статус заказа обновлён');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()->withErrors($e->errors());
         } catch (\Exception $e) {
-            Log::error('Ошибка обновления статуса', [
-                'error' => $e->getMessage(),
-            ]);
-
-            return back()->with('error', 'Ошибка обновления статуса');
+            return back()->with('error', 'Ошибка обновления статуса: ' . $e->getMessage());
         }
     }
 }
