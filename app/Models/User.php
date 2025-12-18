@@ -89,15 +89,15 @@ class User extends Authenticatable
     }
 
     /**
-     * Получить или создать корзину
+     * Получить или создать корзину (оптимизированная версия)
      */
     public function getOrCreateCart(): Cart
     {
-        if (!$this->cart) {
-            return $this->cart()->create();
-        }
-
-        return $this->cart;
+        // Используем firstOrCreate для избежания N+1
+        return $this->cart()->firstOrCreate(
+            ['user_id' => $this->id],
+            []
+        );
     }
 
     /**

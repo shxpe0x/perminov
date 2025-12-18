@@ -11,21 +11,23 @@ class Order extends Model
     protected $fillable = [
         'user_id',
         'status',
-        'total_price',
+        'total_amount',
         'delivery_address',
+        'delivery_method',
+        'payment_method',
         'phone',
-        'comment',
+        'notes',
     ];
 
     protected $casts = [
-        'total_price' => 'integer',
+        'total_amount' => 'integer',
     ];
 
     /**
      * Статусы заказа
      */
-    const STATUS_NEW = 'new';
-    const STATUS_PAID = 'paid';
+    const STATUS_PENDING = 'pending';
+    const STATUS_PROCESSING = 'processing';
     const STATUS_SHIPPED = 'shipped';
     const STATUS_DELIVERED = 'delivered';
     const STATUS_CANCELLED = 'cancelled';
@@ -46,21 +48,75 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    // Scopes
+
     /**
      * Scope для фильтрации по статусу
      */
-    public function scopeByStatus($query, string $status)
+    public function scopeStatus($query, string $status)
     {
         return $query->where('status', $status);
     }
 
     /**
+     * Scope для получения последних заказов
+     */
+    public function scopeRecent($query)
+    {
+        return $query->latest('created_at');
+    }
+
+    /**
      * Scope для получения новых заказов
      */
-    public function scopeNew($query)
+    public function scopePending($query)
     {
-        return $query->where('status', self::STATUS_NEW);
+        return $query->where('status', self::STATUS_PENDING);
     }
+
+    // Методы проверки статуса
+
+    /**
+     * Заказ в ожидании
+     */
+    public function isPending(): bool
+    {
+        return $this->status === self::STATUS_PENDING;
+    }
+
+    /**
+     * Заказ в обработке
+     */
+    public function isProcessing(): bool
+    {
+        return $this->status === self::STATUS_PROCESSING;
+    }
+
+    /**
+     * Заказ отправлен
+     */
+    public function isShipped(): bool
+    {
+        return $this->status === self::STATUS_SHIPPED;
+    }
+
+    /**
+     * Заказ доставлен
+     */
+    public function isDelivered(): bool
+    {
+        return $this->status === self::STATUS_DELIVERED;
+    }
+
+    /**
+     * Можно ли отменить заказ
+     */
+    public function isCancellable(): bool
+    {
+        return in_array($this->status, [self::STATUS_PENDING, self::STATUS_PROCESSING]);
+    }
+
+    // Аксессоры
 
     /**
      * Получить человекочитаемый статус
@@ -68,8 +124,8 @@ class Order extends Model
     public function getStatusLabelAttribute(): string
     {
         return match($this->status) {
-            self::STATUS_NEW => 'Новый',
-            self::STATUS_PAID => 'Оплачен',
+            self::STATUS_PENDING => 'Ожидает обработки',
+            self::STATUS_PROCESSING => 'В обработке',
             self::STATUS_SHIPPED => 'Отправлен',
             self::STATUS_DELIVERED => 'Доставлен',
             self::STATUS_CANCELLED => 'Отменён',
@@ -82,6 +138,6 @@ class Order extends Model
      */
     public function getFormattedTotalAttribute(): string
     {
-        return number_format($this->total_price, 0, ',', ' ') . ' ₽';
+        return number_format($this->total_amount, 0, ',', ' ') . ' ₽';
     }
 }
