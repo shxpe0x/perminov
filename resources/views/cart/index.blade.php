@@ -14,12 +14,12 @@
                         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
                             <div class="p-6">
                                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                                    Товары в корзине ({{ $cart->items->count() }})
+                                    Товары в корзине (<span id="cart-items-count">{{ $cart->items->count() }}</span>)
                                 </h3>
                                 
-                                <div class="space-y-4">
+                                <div class="space-y-4" id="cart-items-container">
                                     @foreach($cart->items as $item)
-                                        <div class="flex gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                        <div class="flex gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg" id="cart-item-{{ $item->id }}">
                                             <!-- Product Image -->
                                             <div class="flex-shrink-0 w-24 h-24 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
                                                 @if($item->product->image)
@@ -60,7 +60,7 @@
                                                     <span class="text-xl font-bold text-gray-900 dark:text-white">
                                                         {{ number_format($item->price, 0, ',', ' ') }} ₽
                                                     </span>
-                                                    <span class="text-sm text-gray-500 dark:text-gray-400"> × {{ $item->quantity }}</span>
+                                                    <span class="text-sm text-gray-500 dark:text-gray-400"> × <span id="qty-{{ $item->id }}">{{ $item->quantity }}</span></span>
                                                 </div>
                                                 
                                                 <!-- Stock Warning -->
@@ -77,53 +77,39 @@
                                             <!-- Quantity Controls -->
                                             <div class="flex flex-col items-end gap-2">
                                                 <div class="flex items-center gap-2">
-                                                    <form method="POST" action="{{ route('cart.update', $item) }}">
-                                                        @csrf
-                                                        @method('PATCH')
-                                                        <input type="hidden" name="quantity" value="{{ max(1, $item->quantity - 1) }}">
-                                                        <button type="submit" 
-                                                                class="p-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition"
-                                                                {{ $item->quantity <= 1 ? 'disabled' : '' }}>
-                                                            <svg class="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
-                                                            </svg>
-                                                        </button>
-                                                    </form>
+                                                    <button onclick="updateQuantity({{ $item->id }}, {{ max(1, $item->quantity - 1) }}, {{ $item->price }}, {{ $item->product->stock }})"
+                                                            class="p-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition"
+                                                            {{ $item->quantity <= 1 ? 'disabled' : '' }}>
+                                                        <svg class="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
+                                                        </svg>
+                                                    </button>
                                                     
-                                                    <span class="w-12 text-center font-semibold text-gray-900 dark:text-white">
+                                                    <span class="w-12 text-center font-semibold text-gray-900 dark:text-white" id="quantity-{{ $item->id }}">
                                                         {{ $item->quantity }}
                                                     </span>
                                                     
-                                                    <form method="POST" action="{{ route('cart.update', $item) }}">
-                                                        @csrf
-                                                        @method('PATCH')
-                                                        <input type="hidden" name="quantity" value="{{ $item->quantity + 1 }}">
-                                                        <button type="submit" 
-                                                                class="p-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition"
-                                                                {{ $item->quantity >= $item->product->stock ? 'disabled' : '' }}>
-                                                            <svg class="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                                            </svg>
-                                                        </button>
-                                                    </form>
+                                                    <button onclick="updateQuantity({{ $item->id }}, {{ $item->quantity + 1 }}, {{ $item->price }}, {{ $item->product->stock }})"
+                                                            class="p-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition"
+                                                            {{ $item->quantity >= $item->product->stock ? 'disabled' : '' }}>
+                                                        <svg class="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                                        </svg>
+                                                    </button>
                                                 </div>
                                                 
                                                 <!-- Remove Button -->
-                                                <form method="POST" action="{{ route('cart.remove', $item) }}">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" 
-                                                            class="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 flex items-center gap-1">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                        </svg>
-                                                        Удалить
-                                                    </button>
-                                                </form>
+                                                <button onclick="removeItem({{ $item->id }})"
+                                                        class="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 flex items-center gap-1">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                    </svg>
+                                                    Удалить
+                                                </button>
                                                 
                                                 <!-- Item Total -->
                                                 <div class="mt-2 text-right">
-                                                    <span class="text-lg font-bold text-gray-900 dark:text-white">
+                                                    <span class="text-lg font-bold text-gray-900 dark:text-white" id="item-total-{{ $item->id }}">
                                                         {{ number_format($item->price * $item->quantity, 0, ',', ' ') }} ₽
                                                     </span>
                                                 </div>
@@ -139,13 +125,13 @@
                     <div class="lg:col-span-1">
                         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 sticky top-6">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                                Ита86о
+                                Итого
                             </h3>
                             
                             <div class="space-y-3 mb-6">
                                 <div class="flex justify-between text-gray-600 dark:text-gray-400">
-                                    <span>Товары ({{ $cart->items->sum('quantity') }} шт.)</span>
-                                    <span>{{ number_format($cart->total, 0, ',', ' ') }} ₽</span>
+                                    <span>Товары (<span id="cart-total-count">{{ $cart->items->sum('quantity') }}</span> шт.)</span>
+                                    <span id="cart-subtotal">{{ number_format($cart->total, 0, ',', ' ') }} ₽</span>
                                 </div>
                                 <div class="flex justify-between text-gray-600 dark:text-gray-400">
                                     <span>Доставка</span>
@@ -153,7 +139,7 @@
                                 </div>
                                 <div class="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-between items-center">
                                     <span class="text-xl font-semibold text-gray-900 dark:text-white">Всего:</span>
-                                    <span class="text-2xl font-bold text-gray-900 dark:text-white">
+                                    <span class="text-2xl font-bold text-gray-900 dark:text-white" id="cart-total">
                                         {{ number_format($cart->total, 0, ',', ' ') }} ₽
                                     </span>
                                 </div>
@@ -191,4 +177,108 @@
             @endif
         </div>
     </div>
+
+    <script>
+    function updateQuantity(itemId, newQuantity, price, maxStock) {
+        if (newQuantity < 1 || newQuantity > maxStock) return;
+        
+        fetch(`/cart/${itemId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ quantity: newQuantity })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update quantity display
+                document.getElementById(`quantity-${itemId}`).textContent = newQuantity;
+                document.getElementById(`qty-${itemId}`).textContent = newQuantity;
+                
+                // Update item total
+                const itemTotal = price * newQuantity;
+                document.getElementById(`item-total-${itemId}`).textContent = itemTotal.toLocaleString('ru-RU') + ' ₽';
+                
+                // Recalculate cart totals
+                recalculateTotals();
+                
+                window.showToast(data.message, 'success');
+            } else {
+                window.showToast(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            window.showToast('Ошибка при обновлении', 'error');
+            console.error('Update error:', error);
+        });
+    }
+
+    function removeItem(itemId) {
+        if (!confirm('Удалить товар из корзины?')) return;
+        
+        fetch(`/cart/${itemId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Remove item from DOM with animation
+                const itemElement = document.getElementById(`cart-item-${itemId}`);
+                itemElement.style.opacity = '0';
+                itemElement.style.transform = 'translateX(-100%)';
+                setTimeout(() => {
+                    itemElement.remove();
+                    
+                    // Check if cart is empty
+                    const container = document.getElementById('cart-items-container');
+                    if (!container.children.length) {
+                        location.reload(); // Reload to show empty cart
+                    } else {
+                        recalculateTotals();
+                    }
+                }, 300);
+                
+                window.showToast(data.message, 'success');
+                if (window.updateCartBadge) window.updateCartBadge(data.count);
+            } else {
+                window.showToast(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            window.showToast('Ошибка при удалении', 'error');
+            console.error('Remove error:', error);
+        });
+    }
+
+    function recalculateTotals() {
+        let totalQuantity = 0;
+        let totalPrice = 0;
+        
+        document.querySelectorAll('[id^="quantity-"]').forEach(el => {
+            const qty = parseInt(el.textContent);
+            totalQuantity += qty;
+            
+            const itemId = el.id.replace('quantity-', '');
+            const itemTotalText = document.getElementById(`item-total-${itemId}`).textContent;
+            const itemTotal = parseInt(itemTotalText.replace(/\D/g, ''));
+            totalPrice += itemTotal;
+        });
+        
+        // Update displays
+        document.getElementById('cart-items-count').textContent = document.querySelectorAll('[id^="cart-item-"]').length;
+        document.getElementById('cart-total-count').textContent = totalQuantity;
+        document.getElementById('cart-subtotal').textContent = totalPrice.toLocaleString('ru-RU') + ' ₽';
+        document.getElementById('cart-total').textContent = totalPrice.toLocaleString('ru-RU') + ' ₽';
+        
+        // Update badge
+        if (window.updateCartBadge) window.updateCartBadge(totalQuantity);
+    }
+    </script>
 </x-app-layout>
