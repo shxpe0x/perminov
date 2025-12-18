@@ -2,11 +2,7 @@
 
 namespace App\Providers;
 
-use App\Events\OrderCreated;
-use App\Events\OrderCancelled;
 use App\Events\ReviewCreated;
-use App\Listeners\SendOrderNotification;
-use App\Listeners\SendOrderCancelledNotification;
 use App\Listeners\UpdateProductRatingCache;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
@@ -18,12 +14,6 @@ class EventServiceProvider extends ServiceProvider
      * @var array<class-string, array<int, class-string>>
      */
     protected $listen = [
-        OrderCreated::class => [
-            SendOrderNotification::class,
-        ],
-        OrderCancelled::class => [
-            SendOrderCancelledNotification::class,
-        ],
         ReviewCreated::class => [
             UpdateProductRatingCache::class,
         ],
