@@ -90,14 +90,11 @@ class User extends Authenticatable
 
     /**
      * Получить или создать корзину
+     * Оптимизировано: используется null coalescing operator вместо проверки if (!$this->cart)
      */
     public function getOrCreateCart(): Cart
     {
-        if (!$this->cart) {
-            return $this->cart()->create();
-        }
-
-        return $this->cart;
+        return $this->cart ?? $this->cart()->create();
     }
 
     /**
