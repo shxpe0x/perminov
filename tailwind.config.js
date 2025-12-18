@@ -9,6 +9,7 @@ export default {
         "./storage/framework/views/*.php",
         "./resources/views/**/*.blade.php",
         "./app/Services/**/*.php",
+        "./node_modules/flowbite/**/*.js",
     ],
 
     theme: {
@@ -80,5 +81,5 @@ export default {
         },
     },
 
-    plugins: [forms, require("tailwindcss-animate")],
+    plugins: [forms, require("tailwindcss-animate"), require("flowbite/plugin")],
 };
