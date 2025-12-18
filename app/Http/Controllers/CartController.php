@@ -35,6 +35,12 @@ class CartController extends Controller
 
         // Check stock
         if ($product->stock < $quantity) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Недостаточно товара на складе'
+                ], 400);
+            }
             return back()->with('error', 'Недостаточно товара на складе');
         }
 
@@ -51,6 +57,12 @@ class CartController extends Controller
             // Check if we can add more
             $newQuantity = $cartItem->quantity + $quantity;
             if ($newQuantity > $product->stock) {
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Недостаточно товара на складе. В корзине уже ' . $cartItem->quantity . ' шт.'
+                    ], 400);
+                }
                 return back()->with('error', 'Недостаточно товара на складе. В корзине уже ' . $cartItem->quantity . ' шт.');
             }
             $cartItem->update(['quantity' => $newQuantity]);
@@ -60,6 +72,17 @@ class CartController extends Controller
                 'product_id' => $product->id,
                 'quantity' => $quantity,
                 'price' => $product->price,
+            ]);
+        }
+
+        // Refresh cart to get updated items
+        $cart->load('items');
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Товар добавлен в корзину!',
+                'count' => $cart->items->sum('quantity')
             ]);
         }
 
@@ -82,10 +105,23 @@ class CartController extends Controller
 
         // Check stock
         if ($request->quantity > $item->product->stock) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Недостаточно товара на складе'
+                ], 400);
+            }
             return back()->with('error', 'Недостаточно товара на складе');
         }
 
         $item->update(['quantity' => $request->quantity]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Количество обновлено'
+            ]);
+        }
 
         return back()->with('success', 'Количество обновлено');
     }
@@ -101,6 +137,13 @@ class CartController extends Controller
         }
 
         $item->delete();
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Товар удалён из корзины'
+            ]);
+        }
 
         return back()->with('success', 'Товар удалён из корзины');
     }
@@ -125,6 +168,13 @@ class CartController extends Controller
         
         if ($cart) {
             $cart->items()->delete();
+        }
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Корзина очищена'
+            ]);
         }
 
         return back()->with('success', 'Корзина очищена');
