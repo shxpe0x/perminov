@@ -18,13 +18,16 @@
                     <x-nav-link :href="route('catalog.index')" :active="request()->routeIs('catalog.*')">
                         Каталог
                     </x-nav-link>
+                    <x-nav-link :href="route('orders.index')" :active="request()->routeIs('orders.*')">
+                        Мои заказы
+                    </x-nav-link>
                 </div>
             </div>
 
             <!-- Right Side: Cart & User -->
             <div class="hidden sm:flex sm:items-center sm:gap-4">
                 <!-- Cart Icon -->
-                <a href="#" 
+                <a href="{{ route('cart.index') }}" 
                    x-data="cart"
                    class="relative p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -89,6 +92,12 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('catalog.index')" :active="request()->routeIs('catalog.*')">
                 Каталог
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('orders.index')" :active="request()->routeIs('orders.*')">
+                Мои заказы
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('cart.index')" :active="request()->routeIs('cart.*')">
+                Корзина
             </x-responsive-nav-link>
         </div>
 
