@@ -8,11 +8,17 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AdminMiddleware
 {
+    /**
+     * Handle an incoming request.
+     */
     public function handle(Request $request, Closure $next): Response
     {
-        // Проверяем авторизацию и права админа в одной строке
-        if (! $request->user()?->is_admin) {
-            abort(403, 'Доступ запрещён. Требуются права администратора.');
+        if (!auth()->check()) {
+            return redirect()->route('login')->with('error', 'Необходимо войти в систему');
+        }
+
+        if (!auth()->user()->is_admin) {
+            abort(403, 'У вас нет прав доступа к админ-панели');
         }
 
         return $next($request);
