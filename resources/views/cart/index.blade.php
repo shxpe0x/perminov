@@ -23,7 +23,7 @@
                                             <!-- Product Image -->
                                             <div class="flex-shrink-0 w-24 h-24 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
                                                 @if($item->product->image)
-                                                    <img src="{{ $item->product->image_url }}" 
+                                                    <img src="{{ Storage::url($item->product->image) }}" 
                                                          alt="{{ $item->product->brand }} {{ $item->product->model }}" 
                                                          class="w-full h-full object-cover">
                                                 @else
@@ -42,11 +42,18 @@
                                                     {{ $item->product->brand }} {{ $item->product->model }}
                                                 </a>
                                                 
-                                                @if($item->product->category)
-                                                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                                        {{ $item->product->category->name }}
-                                                    </p>
-                                                @endif
+                                                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                                    {{ match($item->product->type) {
+                                                        'computer' => '💻 Компьютеры',
+                                                        'keyboard' => '⌨️ Клавиатуры',
+                                                        'mouse' => '🖱️ Мыши',
+                                                        'headphones' => '🎧 Наушники',
+                                                        'monitor' => '🖥️ Мониторы',
+                                                        'webcam' => '📷 Веб-камеры',
+                                                        'speaker' => '🔊 Колонки',
+                                                        default => $item->product->type
+                                                    } }}
+                                                </p>
                                                 
                                                 <!-- Price -->
                                                 <div class="mt-2">
@@ -132,7 +139,7 @@
                     <div class="lg:col-span-1">
                         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 sticky top-6">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                                Итого
+                                Ита86о
                             </h3>
                             
                             <div class="space-y-3 mb-6">
