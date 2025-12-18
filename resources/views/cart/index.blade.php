@@ -51,7 +51,7 @@
                                                 <!-- Price -->
                                                 <div class="mt-2">
                                                     <span class="text-xl font-bold text-gray-900 dark:text-white">
-                                                        {{ number_format($item->product->price, 0, ',', ' ') }} ₽
+                                                        {{ number_format($item->price, 0, ',', ' ') }} ₽
                                                     </span>
                                                     <span class="text-sm text-gray-500 dark:text-gray-400"> × {{ $item->quantity }}</span>
                                                 </div>
@@ -117,7 +117,7 @@
                                                 <!-- Item Total -->
                                                 <div class="mt-2 text-right">
                                                     <span class="text-lg font-bold text-gray-900 dark:text-white">
-                                                        {{ number_format($item->product->price * $item->quantity, 0, ',', ' ') }} ₽
+                                                        {{ number_format($item->price * $item->quantity, 0, ',', ' ') }} ₽
                                                     </span>
                                                 </div>
                                             </div>
