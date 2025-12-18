@@ -4,8 +4,6 @@ namespace App\Listeners;
 
 use App\Events\ReviewCreated;
 use App\Services\ProductService;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Queue\InteractsWithQueue;
 
 class UpdateProductRatingCache
 {
