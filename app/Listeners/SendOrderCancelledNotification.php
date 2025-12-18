@@ -12,18 +12,30 @@ class SendOrderCancelledNotification implements ShouldQueue
     use InteractsWithQueue;
 
     /**
+     * Create the event listener.
+     */
+    public function __construct()
+    {
+        //
+    }
+
+    /**
      * Handle the event.
      */
     public function handle(OrderCancelled $event): void
     {
-        $order = $event->order;
+        // Заглушка для отправки email
+        // В будущем можно интегрировать Mail::to($event->order->user->email)
+        
+        Log::info('Отправлено уведомление об отмене заказа', [
+            'order_id' => $event->order->id,
+            'user_id' => $event->order->user_id,
+            'user_email' => $event->order->user->email,
+            'status' => $event->order->status,
+        ]);
 
         // TODO: Реализовать отправку email
-        // Mail::to($order->user->email)->send(new OrderCancelledMail($order));
-
-        Log::info('Отправлено уведомление об отмене заказа', [
-            'order_id' => $order->id,
-            'user_id' => $order->user_id,
-        ]);
+        // Mail::to($event->order->user->email)
+        //     ->send(new OrderCancelledMail($event->order));
     }
 }
