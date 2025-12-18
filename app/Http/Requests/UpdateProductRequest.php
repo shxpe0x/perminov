@@ -28,7 +28,7 @@ class UpdateProductRequest extends FormRequest
             'price' => 'sometimes|required|numeric|min:0|max:9999999',
             'description' => 'nullable|string|max:5000',
             'category_id' => 'nullable|exists:categories,id',
-            'image' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:2048',
         ];
     }
 
@@ -53,7 +53,7 @@ class UpdateProductRequest extends FormRequest
             'description.max' => 'Описание слишком длинное',
             'category_id.exists' => 'Выбранная категория не существует',
             'image.image' => 'Файл должен быть изображением',
-            'image.mimes' => 'Допустимые форматы: JPEG, JPG, PNG, WEBP',
+            'image.mimes' => 'Допустимые форматы: JPEG, JPG, PNG, WebP, GIF',
             'image.max' => 'Размер изображения не должен превышать 2 МБ',
         ];
     }
