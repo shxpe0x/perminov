@@ -4,13 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\CreateOrderRequest;
 use App\Models\Order;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use App\Services\OrderService;
 
 class OrderController extends Controller
 {
-    public function __construct()
-    {
+    public function __construct(
+        protected OrderService $orderService
+    ) {
         $this->middleware('auth');
     }
 
@@ -38,7 +38,8 @@ class OrderController extends Controller
             abort(403);
         }
 
-        $order->load('items.product');
+        // Используем OrderService для eager loading
+        $order = $this->orderService->getOrderWithDetails($order);
 
         return view('orders.show', compact('order'));
     }
@@ -64,67 +65,21 @@ class OrderController extends Controller
     public function store(CreateOrderRequest $request)
     {
         try {
-            $cart = auth()->user()->cart()->with('items.product')->first();
-
-            if (!$cart || $cart->items->isEmpty()) {
-                return back()->with('error', 'Корзина пуста.');
-            }
-
-            // Проверяем наличие товаров
-            foreach ($cart->items as $item) {
-                if ($item->quantity > $item->product->stock) {
-                    return back()->with('error', "Товар {$item->product->brand} {$item->product->model} закончился на складе.");
-                }
-            }
-
-            DB::beginTransaction();
-
-            // Создаэм заказ
-            $order = Order::create([
-                'user_id' => auth()->id(),
-                'status' => Order::STATUS_NEW,
-                'total_price' => $cart->total,
-                'delivery_address' => $request->delivery_address,
-                'phone' => $request->phone,
-                'comment' => $request->comment,
-            ]);
-
-            // Копируем элементы из корзины
-            foreach ($cart->items as $item) {
-                $order->items()->create([
-                    'product_id' => $item->product_id,
-                    'quantity' => $item->quantity,
-                    'price' => $item->price,
-                ]);
-
-                // Уменьшаем остаток на складе
-                $item->product->decrement('stock', $item->quantity);
-            }
-
-            // Очищаем корзину
-            $cart->items()->delete();
-
-            DB::commit();
-
-            Log::info('Заказ создан', [
-                'user_id' => auth()->id(),
-                'order_id' => $order->id,
-                'total' => $order->total_price,
-            ]);
+            $data = $request->validated();
+            
+            // Используем OrderService
+            $order = $this->orderService->createOrderFromCart(auth()->user(), $data);
 
             return redirect()->route('orders.show', $order)
                 ->with('success', 'Заказ №' . $order->id . ' успешно оформлен!');
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            Log::error('Ошибка создания заказа', [
-                'user_id' => auth()->id(),
-                'error' => $e->getMessage(),
-            ]);
-
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return back()
                 ->withInput()
-                ->with('error', 'Ошибка при оформлении заказа. Попробуйте снова.');
+                ->withErrors($e->errors());
+        } catch (\Exception $e) {
+            return back()
+                ->withInput()
+                ->with('error', 'Ошибка при оформлении заказа: ' . $e->getMessage());
         }
     }
 }
