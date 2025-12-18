@@ -30,6 +30,14 @@ class Review extends Model
     }
 
     /**
+     * Scope для сортировки по дате создания (новые первыми)
+     */
+    public function scopeRecent($query)
+    {
+        return $query->orderByDesc('created_at');
+    }
+
+    /**
      * Scope для фильтрации по рейтингу
      */
     public function scopeByRating($query, int $rating)
