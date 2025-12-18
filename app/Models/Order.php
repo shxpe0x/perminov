@@ -80,6 +80,22 @@ class Order extends Model
         return $query->where('status', $status);
     }
 
+    // Статические методы
+
+    /**
+     * Получить все доступные статусы
+     */
+    public static function statuses(): array
+    {
+        return [
+            self::STATUS_NEW => 'Новый',
+            self::STATUS_PAID => 'Оплачен',
+            self::STATUS_SHIPPED => 'Отправлен',
+            self::STATUS_DELIVERED => 'Доставлен',
+            self::STATUS_CANCELLED => 'Отменён',
+        ];
+    }
+
     // Методы проверки статуса
 
     /**
