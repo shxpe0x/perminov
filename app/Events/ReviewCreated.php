@@ -11,13 +11,11 @@ class ReviewCreated
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public Review $review;
-
     /**
      * Create a new event instance.
      */
-    public function __construct(Review $review)
+    public function __construct(public Review $review)
     {
-        $this->review = $review;
+        //
     }
 }
