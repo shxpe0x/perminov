@@ -85,7 +85,7 @@ class OrderController extends Controller
                     return redirect()->route('cart.index')
                         ->with('error', 'Товар "' . $item->product->brand . ' ' . $item->product->model . '" закончился на складе');
                 }
-                $total += $item->product->price * $item->quantity;
+                $total += $item->price * $item->quantity;
             }
 
             // Build delivery address
@@ -118,7 +118,7 @@ class OrderController extends Controller
                     'order_id' => $order->id,
                     'product_id' => $cartItem->product_id,
                     'quantity' => $cartItem->quantity,
-                    'price' => $cartItem->product->price,
+                    'price' => $cartItem->price,
                 ]);
 
                 // Decrease stock
@@ -127,7 +127,6 @@ class OrderController extends Controller
 
             // Clear cart
             $cart->items()->delete();
-            $cart->updateTotal();
 
             DB::commit();
 
