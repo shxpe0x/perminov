@@ -17,6 +17,12 @@ class CartController extends Controller
     {
         $cart = Auth::user()->cart()->with(['items.product'])->first();
         
+        // Create cart if it doesn't exist
+        if (!$cart) {
+            $cart = Auth::user()->cart()->create();
+            $cart->load('items.product');
+        }
+
         return view('cart.index', compact('cart'));
     }
 
@@ -27,10 +33,13 @@ class CartController extends Controller
     {
         $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'integer|min:1',
+            'quantity' => 'integer|min:1|max:999',
         ]);
 
-        $product = Product::findOrFail($request->product_id);
+        // Check if product exists and not soft deleted
+        $product = Product::whereNull('deleted_at')
+            ->findOrFail($request->product_id);
+            
         $quantity = $request->quantity ?? 1;
 
         // Check stock
@@ -56,6 +65,18 @@ class CartController extends Controller
         if ($cartItem) {
             // Check if we can add more
             $newQuantity = $cartItem->quantity + $quantity;
+            
+            // Validate max quantity
+            if ($newQuantity > 999) {
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Превышено максимальное количество'
+                    ], 400);
+                }
+                return back()->with('error', 'Превышено максимальное количество');
+            }
+            
             if ($newQuantity > $product->stock) {
                 if ($request->wantsJson()) {
                     return response()->json([
@@ -75,8 +96,8 @@ class CartController extends Controller
             ]);
         }
 
-        // Refresh cart to get updated items
-        $cart->load('items');
+        // Refresh cart with products to avoid N+1
+        $cart->load('items.product');
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -95,7 +116,7 @@ class CartController extends Controller
     public function update(Request $request, CartItem $item)
     {
         $request->validate([
-            'quantity' => 'required|integer|min:1',
+            'quantity' => 'required|integer|min:1|max:999',
         ]);
 
         // Check if item belongs to user's cart
