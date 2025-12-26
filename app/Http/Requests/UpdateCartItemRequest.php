@@ -22,7 +22,7 @@ class UpdateCartItemRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'quantity' => 'required|integer|min:1|max:99',
+            'quantity' => 'required|integer|min:1|max:999',
         ];
     }
 
@@ -37,7 +37,7 @@ class UpdateCartItemRequest extends FormRequest
             'quantity.required' => 'Укажите количество',
             'quantity.integer' => 'Количество должно быть целым числом',
             'quantity.min' => 'Минимальное количество - 1',
-            'quantity.max' => 'Максимальное количество - 99',
+            'quantity.max' => 'Максимальное количество - 999',
         ];
     }
 }
