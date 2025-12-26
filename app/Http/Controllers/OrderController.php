@@ -6,6 +6,8 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Http\Requests\CreateOrderRequest;
+use App\Events\OrderCreated;
+use App\Events\OrderCancelled;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -138,6 +140,9 @@ class OrderController extends Controller
 
             DB::commit();
 
+            // Dispatch event after successful commit
+            event(new OrderCreated($order));
+
             // Log order creation
             Log::info('Order created', [
                 'order_id' => $order->id,
@@ -194,6 +199,9 @@ class OrderController extends Controller
             $order->update(['status' => Order::STATUS_CANCELLED]);
 
             DB::commit();
+
+            // Dispatch event after successful commit
+            event(new OrderCancelled($order));
 
             // Log order cancellation
             Log::info('Order cancelled', [
