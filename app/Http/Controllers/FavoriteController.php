@@ -17,8 +17,10 @@ class FavoriteController extends Controller
      */
     public function index()
     {
+        // Только активные (не удаленные) товары
         $favorites = auth()->user()
             ->favorites()
+            ->whereNull('products.deleted_at')
             ->with('category')
             ->paginate(12);
 
@@ -31,6 +33,11 @@ class FavoriteController extends Controller
     public function toggle(Product $product)
     {
         try {
+            // Проверка на soft deleted
+            if ($product->trashed()) {
+                return back()->with('error', 'Товар больше не доступен.');
+            }
+            
             $user = auth()->user();
 
             if ($user->hasFavorite($product->id)) {
