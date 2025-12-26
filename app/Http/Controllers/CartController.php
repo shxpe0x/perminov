@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Product;
+use App\Http\Requests\UpdateCartItemRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -113,12 +114,8 @@ class CartController extends Controller
     /**
      * Update cart item quantity.
      */
-    public function update(Request $request, CartItem $item)
+    public function update(UpdateCartItemRequest $request, CartItem $item)
     {
-        $request->validate([
-            'quantity' => 'required|integer|min:1|max:999',
-        ]);
-
         // Check if item belongs to user's cart
         if ($item->cart->user_id !== Auth::id()) {
             abort(403);
@@ -171,11 +168,22 @@ class CartController extends Controller
 
     /**
      * Get cart items count (AJAX).
+     * Only counts items with active (non-deleted) products.
      */
     public function count()
     {
         $cart = Auth::user()->cart;
-        $count = $cart ? $cart->items->sum('quantity') : 0;
+        
+        if (!$cart) {
+            return response()->json(['count' => 0]);
+        }
+        
+        // Filter only active products (not soft deleted)
+        $count = $cart->items()
+            ->whereHas('product', function ($query) {
+                $query->whereNull('deleted_at');
+            })
+            ->sum('quantity');
 
         return response()->json(['count' => $count]);
     }
