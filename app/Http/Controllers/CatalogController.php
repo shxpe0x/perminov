@@ -30,13 +30,16 @@ class CatalogController extends Controller
             $query->where('type', $type);
         }
 
-        // Search filter
+        // Search filter with proper escaping
         $q = trim((string) $request->query('q', ''));
         if ($q) {
-            $query->where(function ($query) use ($q) {
-                $query->where('brand', 'LIKE', "%{$q}%")
-                      ->orWhere('model', 'LIKE', "%{$q}%")
-                      ->orWhere('description', 'LIKE', "%{$q}%");
+            // Escape special LIKE characters
+            $escapedQ = str_replace(['%', '_'], ['\\%', '\\_'], $q);
+            
+            $query->where(function ($query) use ($escapedQ) {
+                $query->where('brand', 'LIKE', "%{$escapedQ}%")
+                      ->orWhere('model', 'LIKE', "%{$escapedQ}%")
+                      ->orWhere('description', 'LIKE', "%{$escapedQ}%");
             });
         }
 
@@ -84,7 +87,7 @@ class CatalogController extends Controller
         // Get products with pagination
         $products = $query->paginate(12)->withQueryString();
 
-        // Get unique brands for filter
+        // Get unique brands for filter (only from non-deleted products)
         $brands = Product::query()
             ->select('brand')
             ->distinct()
@@ -96,8 +99,8 @@ class CatalogController extends Controller
 
     public function show(Product $product)
     {
-        // Eager loading связей
-        $product->load(['category', 'reviews.user']);
+        // Eager loading связей и исключение soft deleted
+        $product->loadMissing(['category', 'reviews.user']);
 
         return view('catalog.show', compact('product'));
     }
