@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Product;
+use App\Http\Requests\CreateOrderRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class OrderController extends Controller
 {
@@ -36,8 +39,14 @@ class OrderController extends Controller
                 ->with('error', 'Ваша корзина пуста');
         }
 
-        // Check stock for all items
+        // Check stock and soft deletes for all items
         foreach ($cart->items as $item) {
+            // Check if product is soft deleted
+            if ($item->product->trashed()) {
+                return redirect()->route('cart.index')
+                    ->with('error', 'Товар "' . $item->product->brand . ' ' . $item->product->model . '" больше не доступен');
+            }
+            
             if ($item->product->stock < $item->quantity) {
                 return redirect()->route('cart.index')
                     ->with('error', 'Товар "' . $item->product->brand . ' ' . $item->product->model . '" закончился на складе');
@@ -50,21 +59,9 @@ class OrderController extends Controller
     /**
      * Store a new order.
      */
-    public function store(Request $request)
+    public function store(CreateOrderRequest $request)
     {
-        $validated = $request->validate([
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'email' => 'required|email|max:255',
-            'phone' => 'required|string|max:20',
-            'city' => 'required|string|max:255',
-            'street' => 'required|string|max:255',
-            'house' => 'required|string|max:50',
-            'apartment' => 'nullable|string|max:50',
-            'postal_code' => 'nullable|string|max:10',
-            'payment_method' => 'required|in:card,cash',
-            'comment' => 'nullable|string|max:1000',
-        ]);
+        $validated = $request->validated();
 
         $cart = Auth::user()->cart()->with(['items.product'])->first();
 
@@ -80,6 +77,13 @@ class OrderController extends Controller
             // Check stock and calculate total
             $total = 0;
             foreach ($cart->items as $item) {
+                // Check if product is soft deleted
+                if ($item->product->trashed()) {
+                    DB::rollBack();
+                    return redirect()->route('cart.index')
+                        ->with('error', 'Товар "' . $item->product->brand . ' ' . $item->product->model . '" больше не доступен');
+                }
+                
                 if ($item->product->stock < $item->quantity) {
                     DB::rollBack();
                     return redirect()->route('cart.index')
@@ -101,18 +105,14 @@ class OrderController extends Controller
             // Create order
             $order = Order::create([
                 'user_id' => Auth::id(),
-                'status' => 'pending',
-                'total' => $total,
-                'first_name' => $validated['first_name'],
-                'last_name' => $validated['last_name'],
-                'email' => $validated['email'],
-                'phone' => $validated['phone'],
+                'status' => Order::STATUS_NEW,
+                'total_price' => $total,
                 'delivery_address' => $deliveryAddress,
-                'payment_method' => $validated['payment_method'],
+                'phone' => $validated['phone'],
                 'comment' => $validated['comment'] ?? null,
             ]);
 
-            // Create order items and decrease stock
+            // Create order items and decrease stock atomically
             foreach ($cart->items as $cartItem) {
                 OrderItem::create([
                     'order_id' => $order->id,
@@ -121,8 +121,16 @@ class OrderController extends Controller
                     'price' => $cartItem->price,
                 ]);
 
-                // Decrease stock
-                $cartItem->product->decrement('stock', $cartItem->quantity);
+                // Atomic stock decrement with race condition protection
+                $affected = Product::where('id', $cartItem->product_id)
+                    ->where('stock', '>=', $cartItem->quantity)
+                    ->decrement('stock', $cartItem->quantity);
+
+                if (!$affected) {
+                    DB::rollBack();
+                    return redirect()->route('cart.index')
+                        ->with('error', 'Товар "' . $cartItem->product->brand . ' ' . $cartItem->product->model . '" закончился на складе');
+                }
             }
 
             // Clear cart
@@ -130,10 +138,21 @@ class OrderController extends Controller
 
             DB::commit();
 
+            // Log order creation
+            Log::info('Order created', [
+                'order_id' => $order->id,
+                'user_id' => Auth::id(),
+                'total' => $total
+            ]);
+
             return redirect()->route('orders.show', $order)
                 ->with('success', 'Заказ №' . $order->id . ' успешно оформлен!');
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Order creation failed', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
             return back()->with('error', 'Произошла ошибка при оформлении заказа');
         }
     }
@@ -143,12 +162,8 @@ class OrderController extends Controller
      */
     public function show(Order $order)
     {
-        // Check if order belongs to user
-        if ($order->user_id !== Auth::id()) {
-            abort(403);
-        }
-
-        $order->load(['items.product']);
+        // Use relationship to prevent information leakage
+        $order = Auth::user()->orders()->with(['items.product'])->findOrFail($order->id);
 
         return view('orders.show', compact('order'));
     }
@@ -158,32 +173,41 @@ class OrderController extends Controller
      */
     public function cancel(Order $order)
     {
-        // Check if order belongs to user
-        if ($order->user_id !== Auth::id()) {
-            abort(403);
-        }
+        // Use relationship to prevent information leakage
+        $order = Auth::user()->orders()->with(['items.product'])->findOrFail($order->id);
 
-        // Check if order can be cancelled
-        if (!in_array($order->status, ['pending', 'processing'])) {
+        // Check if order can be cancelled using model method
+        if (!$order->isCancellable()) {
             return back()->with('error', 'Этот заказ нельзя отменить');
         }
 
         DB::beginTransaction();
 
         try {
-            // Return stock
+            // Return stock atomically
             foreach ($order->items as $item) {
-                $item->product->increment('stock', $item->quantity);
+                Product::where('id', $item->product_id)
+                    ->increment('stock', $item->quantity);
             }
 
-            // Update order status
-            $order->update(['status' => 'cancelled']);
+            // Update order status using constant
+            $order->update(['status' => Order::STATUS_CANCELLED]);
 
             DB::commit();
+
+            // Log order cancellation
+            Log::info('Order cancelled', [
+                'order_id' => $order->id,
+                'user_id' => Auth::id()
+            ]);
 
             return back()->with('success', 'Заказ отменён');
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Order cancellation failed', [
+                'order_id' => $order->id,
+                'error' => $e->getMessage()
+            ]);
             return back()->with('error', 'Произошла ошибка при отмене заказа');
         }
     }
