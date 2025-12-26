@@ -19,7 +19,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
+            'check.blocked' => \App\Http\Middleware\CheckUserBlocked::class,
         ]);
+
+        // Apply CheckUserBlocked middleware globally for authenticated users
+        $middleware->append(\App\Http\Middleware\CheckUserBlocked::class);
 
         $middleware->redirectGuestsTo(fn () => route('login'));
 
